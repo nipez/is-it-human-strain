@@ -150,6 +150,83 @@
     ];
 
     // ═══════════════════════════════════════════════════
+    // KNOWN PRODUCTS — bypass API for our own brands
+    // ═══════════════════════════════════════════════════
+    const KNOWN_PRODUCTS = {
+      "human strain b. adolescentis": {
+        product_name: "Human Strain™ B. adolescentis", brand: "Element Longevity",
+        cfu: "8 Billion", strain_count: 1, strain_designations_listed: true,
+        strains: ["Bifidobacterium adolescentis"],
+        notes: "Single-strain precision probiotic with strain designation iVS-1 (SH001). Includes GOS + XOS prebiotics for synbiotic colonization support. DNA-sequence verified, third-party tested.",
+        isOwnProduct: true,
+        highlights: [
+          { icon: "🧬", title: "100% Human-Native", desc: "Every strain in this product was isolated from the healthy human gut. Resident bacteria, not tourists from soil, dairy, or animals." },
+          { icon: "🎯", title: "Precision Single-Strain", desc: "One clinically studied strain at an effective dose — not a kitchen-sink blend of 10+ random species hoping something sticks." },
+          { icon: "🏷️", title: "Named Strain Designation", desc: "Uses iVS-1 (SH001) — a specific, traceable strain with published research. You know exactly what you're getting." },
+          { icon: "🌱", title: "Synbiotic System", desc: "Built-in GOS + XOS prebiotics feed and sustain the probiotic colony — a complete seed-and-feed system in one capsule." },
+        ],
+      },
+      "human strain b. longum": {
+        product_name: "Human Strain™ B. longum", brand: "Element Longevity",
+        cfu: "8 Billion", strain_count: 1, strain_designations_listed: true,
+        strains: ["Bifidobacterium longum"],
+        notes: "Single-strain precision psychobiotic with strain designation SH015. Targets gut-brain axis support for mood, stress resilience, and sleep. Includes GOS + XOS prebiotics.",
+        isOwnProduct: true,
+        highlights: [
+          { icon: "🧬", title: "100% Human-Native", desc: "B. longum is one of the most studied human-native species with over 280 published studies on key strains." },
+          { icon: "🧠", title: "Gut-Brain Axis Support", desc: "Clinically linked to HPA axis modulation — supports mood, stress resilience, cognitive function, and sleep quality." },
+          { icon: "🎯", title: "Precision Single-Strain", desc: "One targeted strain at an effective dose, not a scattershot blend. Precision over volume." },
+          { icon: "🌱", title: "Synbiotic System", desc: "Paired with GOS + XOS prebiotics to fuel colonization. Your bacteria arrive with their own food supply." },
+        ],
+      },
+      "human strain complete prebiotic": {
+        product_name: "Human Strain™ Complete Prebiotic", brand: "Element Longevity",
+        cfu: "N/A (prebiotic)", strain_count: 0, strain_designations_listed: true,
+        strains: [],
+        notes: "Precision prebiotic blend designed to feed and sustain human-native Bifidobacteria colonies. Contains XOS, GOS, acacia gum, reishi mushroom polysaccharides, and D-ribose.",
+        isOwnProduct: true,
+        highlights: [
+          { icon: "🌱", title: "Precision Prebiotic Fuel", desc: "Specifically formulated to feed Bifidobacteria — the human-native species that matter most. Not a generic fiber supplement." },
+          { icon: "💨", title: "No Gas or Bloating", desc: "Designed to support colonization without the digestive discomfort caused by conventional fiber supplements." },
+          { icon: "🔬", title: "Multi-Pathway Formula", desc: "XOS, GOS, acacia gum, reishi polysaccharides, and D-ribose target microbial diversity, gut barrier integrity, and metabolic function." },
+        ],
+      },
+      "holy cow! lactose digestion probiotic": {
+        product_name: "Holy Cow! Once-Daily Lactose Digestion", brand: "Element Longevity",
+        cfu: "10 Billion", strain_count: 2, strain_designations_listed: true,
+        strains: ["Bifidobacterium adolescentis", "Bifidobacterium longum"],
+        notes: "Clinically studied B. adolescentis iVS-1 (SH001) + B. longum SH015. Trains the gut to produce its own beta-galactosidase enzyme for 24-hour lactose digestion support — not a per-meal enzyme pill.",
+        isOwnProduct: true,
+        highlights: [
+          { icon: "🧬", title: "100% Human-Native", desc: "Both strains isolated from the healthy human gut. No animal, dairy, or soil organisms." },
+          { icon: "⏰", title: "24-Hour Coverage", desc: "Unlike enzyme pills that only work per-meal, this trains your gut to produce its own lactase around the clock. One capsule with breakfast." },
+          { icon: "🎯", title: "Named Strain Designations", desc: "iVS-1 (SH001) and SH015 — specific, published strains you can verify. Not generic species-level labeling." },
+          { icon: "🔬", title: "Clinically Studied", desc: "Core strain backed by a published randomized controlled trial demonstrating lactose digestion improvement." },
+        ],
+      },
+      "element longevity": {
+        product_name: "Element Longevity", brand: "Element Longevity",
+        cfu: "Varies by product", strain_count: 0, strain_designations_listed: true,
+        strains: ["Bifidobacterium adolescentis", "Bifidobacterium longum"],
+        notes: "Element Longevity is the parent company behind Human Strain™ and Holy Cow! — a portfolio of precision gut health brands built exclusively on human-native probiotic science.",
+        isOwnProduct: true,
+        highlights: [
+          { icon: "🧬", title: "Human-Native Exclusive", desc: "Every probiotic in the Element Longevity portfolio uses strains isolated from healthy humans. No soil, no dairy, no animal-derived organisms." },
+          { icon: "🎯", title: "Precision Over Volume", desc: "Single-strain and dual-strain formulas at clinically effective doses — not kitchen-sink blends of 10+ random species." },
+          { icon: "🌱", title: "Seed & Feed System", desc: "Synbiotic formulations pair human-native strains with matched prebiotics for colonization support." },
+        ],
+      },
+    };
+
+    function findKnownProduct(query) {
+      const q = query.toLowerCase().trim();
+      for (const [key, data] of Object.entries(KNOWN_PRODUCTS)) {
+        if (q.includes(key) || key.includes(q)) return data;
+      }
+      return null;
+    }
+
+    // ═══════════════════════════════════════════════════
     // UTILITY FUNCTIONS
     // ═══════════════════════════════════════════════════
     function matchStrain(name) {
@@ -223,31 +300,52 @@
       const humanStrains = classifiedStrains.filter(s => s.origin === "human");
       const nonHumanStrains = classifiedStrains.filter(s => s.origin !== "human");
       const total = classifiedStrains.length, humanCount = humanStrains.length;
+      const isOwn = productData.isOwnProduct;
+      const highlights = productData.highlights || [];
+
+      // Only generate issues for non-own products
       const issues = [];
-      if (total >= 8) issues.push({ icon:"🎰", title:"Kitchen-Sink Formula", desc:`${total} different species thrown together. More strains doesn't mean better results — it often means less of each strain where it counts.` });
-      if (!productData.strain_designations_listed) issues.push({ icon:"🏷️", title:"No Strain Designations", desc:"This label lists species but not specific strain IDs. Without strain designations, you can't verify which exact organisms you're getting or whether they have clinical evidence behind them." });
-      if (nonHumanStrains.some(s=>s.origin==="animal")) issues.push({ icon:"🐄", title:"Contains Animal-Derived Strains", desc:"At least one species was originally isolated from animal intestines — not the human gut. Popular because they're cheap and shelf-stable, not because they're ideal for humans." });
-      if (nonHumanStrains.some(s=>s.origin==="soil")) issues.push({ icon:"🪨", title:"Contains Soil Organisms", desc:"Includes soil-dwelling bacteria. Extremely shelf-stable, which is great for manufacturers — but they didn't evolve in your gut." });
-      if (nonHumanStrains.some(s=>s.origin==="dairy")) issues.push({ icon:"🧀", title:"Contains Dairy-Culture Strains", desc:"Includes species that evolved in dairy processing environments — yogurt and cheese production — not in the human microbiome." });
-      if (productData.cfu && parseInt(String(productData.cfu).replace(/\D/g,"")) > 50) issues.push({ icon:"📊", title:"High-CFU Marketing", desc:"A massive CFU count sounds impressive but research shows precision dosing with the right strain often outperforms blasting the gut with billions of random organisms." });
+      if (!isOwn) {
+        if (total >= 8) issues.push({ icon:"🎰", title:"Kitchen-Sink Formula", desc:`${total} different species thrown together. More strains doesn't mean better results — it often means less of each strain where it counts.` });
+        if (!productData.strain_designations_listed) issues.push({ icon:"🏷️", title:"No Strain Designations", desc:"This label lists species but not specific strain IDs. Without strain designations, you can't verify which exact organisms you're getting or whether they have clinical evidence behind them." });
+        if (nonHumanStrains.some(s=>s.origin==="animal")) issues.push({ icon:"🐄", title:"Contains Animal-Derived Strains", desc:"At least one species was originally isolated from animal intestines — not the human gut. Popular because they're cheap and shelf-stable, not because they're ideal for humans." });
+        if (nonHumanStrains.some(s=>s.origin==="soil")) issues.push({ icon:"🪨", title:"Contains Soil Organisms", desc:"Includes soil-dwelling bacteria. Extremely shelf-stable, which is great for manufacturers — but they didn't evolve in your gut." });
+        if (nonHumanStrains.some(s=>s.origin==="dairy")) issues.push({ icon:"🧀", title:"Contains Dairy-Culture Strains", desc:"Includes species that evolved in dairy processing environments — yogurt and cheese production — not in the human microbiome." });
+        if (productData.cfu && parseInt(String(productData.cfu).replace(/\D/g,"")) > 50) issues.push({ icon:"📊", title:"High-CFU Marketing", desc:"A massive CFU count sounds impressive but research shows precision dosing with the right strain often outperforms blasting the gut with billions of random organisms." });
+      }
 
       return <div style={{animation:"fadeSlideIn 0.4s ease"}}>
         <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:14,fontWeight:600,cursor:"pointer",padding:"0 0 24px"}}>← Analyze another product</button>
-        <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:"28px",marginBottom:20}}>
+        <div style={{background: isOwn ? "rgba(124,111,224,0.06)" : "var(--bg-secondary)",border:`1px solid ${isOwn ? "rgba(124,111,224,0.2)" : "var(--border-color)"}`,borderRadius:16,padding:"28px",marginBottom:20}}>
           <div className="analysis-header">
             <div style={{flex:1,minWidth:200}}>
-              <p style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 6px"}}>{productData.brand||""}</p>
+              <p style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color: isOwn ? "#7C6FE0" : "var(--text-tertiary)",margin:"0 0 6px"}}>{productData.brand||""}</p>
               <h2 style={{fontSize:22,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>{productData.product_name}</h2>
               <div className="analysis-stats">
-                {productData.cfu && <span><strong>{productData.cfu}</strong> CFU</span>}
-                <span><strong>{total}</strong> strains</span>
-                <span><strong>{humanCount}</strong> human-native</span>
-                <span><strong style={{color:"#E05555"}}>{total-humanCount}</strong> non-human</span>
+                {productData.cfu && productData.cfu !== "N/A (prebiotic)" && <span><strong>{productData.cfu}</strong> CFU</span>}
+                {total > 0 && <span><strong>{total}</strong> strain{total!==1?"s":""}</span>}
+                {humanCount > 0 && <span><strong>{humanCount}</strong> human-native</span>}
+                {(total-humanCount) > 0 && <span><strong style={{color:"#E05555"}}>{total-humanCount}</strong> non-human</span>}
+                {isOwn && total > 0 && <span style={{color:"#7C6FE0",fontWeight:600}}>✓ 100% Human-Native</span>}
               </div>
+              {productData.notes && <p style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.6,marginTop:10}}>{productData.notes}</p>}
             </div>
-            <ScoreRing humanCount={humanCount} total={total} />
+            {total > 0 && <ScoreRing humanCount={humanCount} total={total} />}
           </div>
         </div>
+
+        {/* Highlights for own products (green) */}
+        {highlights.length > 0 && <div style={{marginBottom:20}}>
+          <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C6FE0",margin:"0 0 12px"}}>What makes this different</h3>
+          <div className="issues-grid">
+            {highlights.map((h,i) => <div key={i} style={{background:"rgba(124,111,224,0.06)",border:"1px solid rgba(124,111,224,0.15)",borderRadius:12,padding:"16px 18px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{fontSize:18}}>{h.icon}</span><span style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{h.title}</span></div>
+              <p style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.6,margin:0}}>{h.desc}</p>
+            </div>)}
+          </div>
+        </div>}
+
+        {/* Issues for competitor products (red) */}
         {issues.length > 0 && <div style={{marginBottom:20}}>
           <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>What we found</h3>
           <div className="issues-grid">
@@ -257,15 +355,29 @@
             </div>)}
           </div>
         </div>}
-        <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>Strain-by-strain breakdown</h3>
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
-          {classifiedStrains.map((strain,i) => { const c = ORIGIN_CONFIG[strain.origin]||ORIGIN_CONFIG.unknown; return <div key={i} className="strain-row" style={{background:c.bgColor,border:`1px solid ${c.borderColor}`,animation:`fadeSlideIn 0.3s ease ${i*0.04}s both`}}><span style={{fontSize:20,flexShrink:0}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{strain.name}</div><div style={{fontSize:12,color:c.color,fontWeight:500}}>{c.tagline} · {strain.source}</div></div><OriginBadge origin={strain.origin} small /></div>; })}
-        </div>
-        <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)"}}>
-          <p style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>🧬 Ready for a probiotic that belongs in your body?</p>
-          <p style={{fontSize:14,color:"var(--text-secondary)",margin:"0 0 20px",lineHeight:1.6}}>Human Strain™ uses only species isolated from healthy humans.<br/>Residents, not tourists. Precision-dosed. Third-party tested.</p>
-          <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:15,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
-        </div>
+
+        {/* Strain breakdown — only show if there are strains */}
+        {classifiedStrains.length > 0 && <>
+          <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>Strain-by-strain breakdown</h3>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+            {classifiedStrains.map((strain,i) => { const c = ORIGIN_CONFIG[strain.origin]||ORIGIN_CONFIG.unknown; return <div key={i} className="strain-row" style={{background:c.bgColor,border:`1px solid ${c.borderColor}`,animation:`fadeSlideIn 0.3s ease ${i*0.04}s both`}}><span style={{fontSize:20,flexShrink:0}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{strain.name}</div><div style={{fontSize:12,color:c.color,fontWeight:500}}>{c.tagline} · {strain.source}</div></div><OriginBadge origin={strain.origin} small /></div>; })}
+          </div>
+        </>}
+
+        {/* CTA — different for own vs competitor */}
+        {isOwn ? (
+          <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)"}}>
+            <p style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>🧬 This is what precision probiotics look like.</p>
+            <p style={{fontSize:14,color:"var(--text-secondary)",margin:"0 0 20px",lineHeight:1.6}}>Human-native strains. Clinically studied. No fillers, no tourists.<br/>Now compare it to what you've been taking.</p>
+            <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:15,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
+          </div>
+        ) : (
+          <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)"}}>
+            <p style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>🧬 Ready for a probiotic that belongs in your body?</p>
+            <p style={{fontSize:14,color:"var(--text-secondary)",margin:"0 0 20px",lineHeight:1.6}}>Human Strain™ uses only species isolated from healthy humans.<br/>Residents, not tourists. Precision-dosed. Third-party tested.</p>
+            <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:15,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
+          </div>
+        )}
       </div>;
     }
 
@@ -370,6 +482,14 @@
 
       const handleProductSearch = async () => {
         if (!productQuery.trim()) return;
+        // Check known products first (instant, no API call)
+        const known = findKnownProduct(productQuery);
+        if (known) {
+          const c = classifyStrains(known.strains || []);
+          setProductData(known);
+          setClassifiedStrains(c);
+          return;
+        }
         setLoading(true); setError(""); setLoadingMsg("Searching for product details...");
         try { const d = await lookupProduct(productQuery); setLoadingMsg("Classifying strains..."); const c = classifyStrains(d.strains||[]); setProductData(d); setClassifiedStrains(c); } catch(e) { setError("Couldn't find that product. Try a more specific name."); }
         setLoading(false);
