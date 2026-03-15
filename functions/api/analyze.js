@@ -1,15 +1,53 @@
+// Cloudflare Pages Function — proxies requests to the Anthropic API
+// Includes server-side caching so repeat product searches are free & instant
+// Set your ANTHROPIC_API_KEY in Cloudflare Pages > Settings > Environment Variables
+
+const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+};
+
+// Extract a cache key from the request body (product name from the prompt)
+function extractCacheKey(body) {
+  try {
+    const msg = body?.messages?.[0]?.content;
+    // Only cache text-based product lookups, not image uploads
+    if (typeof msg !== "string") return null;
+    const match = msg.match(/product:\s*"([^"]+)"/i);
+    if (match) return "hs:" + match[1].toLowerCase().trim().replace(/[^a-z0-9]/g, "_");
+  } catch {}
+  return null;
+}
+
 export async function onRequestPost(context) {
   const apiKey = context.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "API key not configured" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      status: 500, headers: CORS_HEADERS,
     });
   }
 
   try {
     const body = await context.request.json();
+    const cacheKey = extractCacheKey(body);
 
+    // Check server cache (Cloudflare edge cache)
+    if (cacheKey) {
+      const cache = caches.default;
+      const cacheUrl = new URL("https://cache.internal/" + cacheKey);
+      const cacheRequest = new Request(cacheUrl.toString());
+      const cachedResponse = await cache.match(cacheRequest);
+      if (cachedResponse) {
+        const cachedData = await cachedResponse.text();
+        return new Response(cachedData, {
+          status: 200,
+          headers: { ...CORS_HEADERS, "X-Cache": "HIT" },
+        });
+      }
+    }
+
+    // No cache hit — call Anthropic API
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -21,21 +59,35 @@ export async function onRequestPost(context) {
     });
 
     const data = await response.json();
-    return new Response(JSON.stringify(data), {
+    const responseBody = JSON.stringify(data);
+
+    // Cache successful responses on the server
+    if (cacheKey && response.status === 200) {
+      const cache = caches.default;
+      const cacheUrl = new URL("https://cache.internal/" + cacheKey);
+      const cacheRequest = new Request(cacheUrl.toString());
+      const cacheResponse = new Response(responseBody, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=" + CACHE_TTL,
+        },
+      });
+      context.waitUntil(cache.put(cacheRequest, cacheResponse));
+    }
+
+    return new Response(responseBody, {
       status: response.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { ...CORS_HEADERS, "X-Cache": "MISS" },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      status: 500, headers: CORS_HEADERS,
     });
   }
 }
 
+// Handle CORS preflight
 export async function onRequestOptions() {
   return new Response(null, {
     headers: {
