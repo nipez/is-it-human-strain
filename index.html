@@ -299,17 +299,40 @@
       return null;
     }
 
-    function classifyStrains(strainNames) {
-      // Deduplicate by matched DB name
+    function classifyStrains(strainData) {
+      // strainData can be:
+      // - array of strings: ["Lactobacillus acidophilus", ...]
+      // - array of objects: [{name: "...", origin: "human", source: "..."}, ...]
       const seen = new Set();
-      return strainNames.map(name => {
+      return strainData.map(item => {
+        const name = typeof item === "string" ? item : item.name;
+        const apiOrigin = typeof item === "object" ? item.origin : null;
+        const apiSource = typeof item === "object" ? item.source : null;
+        const apiNotes = typeof item === "object" ? item.notes : null;
+
+        // Try local DB first
         const match = matchStrain(name);
         if (match) {
-          if (seen.has(match.name)) return null; // skip duplicate
+          if (seen.has(match.name)) return null;
           seen.add(match.name);
           return { inputName: name, ...match, matched: true };
         }
-        return { inputName: name, name, origin: "unknown", source: "Unknown", notes: "This strain is not in our database.", matched: false };
+
+        // Fall back to API-provided classification
+        const dedupKey = name.toLowerCase().trim();
+        if (seen.has(dedupKey)) return null;
+        seen.add(dedupKey);
+
+        if (apiOrigin && ORIGIN_CONFIG[apiOrigin]) {
+          return {
+            inputName: name, name, origin: apiOrigin,
+            source: apiSource || ORIGIN_CONFIG[apiOrigin].tagline,
+            notes: apiNotes || "Classification provided by AI analysis.",
+            matched: false,
+          };
+        }
+
+        return { inputName: name, name, origin: "unknown", source: "Unknown", notes: "This strain is not in our database yet.", matched: false };
       }).filter(Boolean);
     }
 
@@ -350,7 +373,7 @@
       const data = await callAPI({
         model: "claude-sonnet-4-20250514", max_tokens: 1000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. Return ONLY a JSON object: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":["full species name 1",...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }],
+        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a JSON object: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }],
       });
       const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
       const m = text.match(/\{[\s\S]*\}/);
@@ -367,7 +390,7 @@
         model: "claude-sonnet-4-20250514", max_tokens: 1000,
         messages: [{ role: "user", content: [
           { type: "image", source: { type: "base64", media_type: mediaType, data: base64Data } },
-          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species. Return ONLY a JSON object: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":["full species name 1",...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }
+          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a JSON object: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }
         ] }],
       });
       const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
