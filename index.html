@@ -82,8 +82,8 @@
     // STRAIN DATABASE
     // ═══════════════════════════════════════════════════
     const STRAIN_DATABASE = [
-      { name: "Bifidobacterium adolescentis", origin: "human", source: "Human intestine", notes: "Abundant in centenarians. Declines sharply with age. Keystone species for gut-immune signaling, GABA production, and metabolic health.", aliases: ["B. adolescentis"], popular_strains: ["iVS-1 / SH001"] },
-      { name: "Bifidobacterium longum", origin: "human", source: "Human intestine", notes: "One of the most studied human-native species. Supports the gut-brain axis, HPA stress response, mood, and cognitive function. Over 280 studies on key strains like BB536.", aliases: ["B. longum"], popular_strains: ["BB536 (Morinaga)", "ATCC 15707", "SH015"] },
+      { name: "Bifidobacterium adolescentis", origin: "human", source: "Human intestine", notes: "Abundant in centenarians. Declines sharply with age. Keystone species for gut-immune signaling, GABA production, and metabolic health.", aliases: ["B. adolescentis"], popular_strains: ["HS01"] },
+      { name: "Bifidobacterium longum", origin: "human", source: "Human intestine", notes: "One of the most studied human-native species. Supports the gut-brain axis, HPA stress response, mood, and cognitive function. Over 280 studies on key strains like BB536.", aliases: ["B. longum"], popular_strains: ["BB536 (Morinaga)", "ATCC 15707", "HS02"] },
       { name: "Bifidobacterium longum subsp. infantis", origin: "human", source: "Human infant intestine / breast milk", notes: "The dominant species in breastfed infants. Critical for early immune development and digestion of human milk oligosaccharides (HMOs).", aliases: ["B. infantis", "Bifidobacterium infantis"], popular_strains: ["EVC001", "M-63", "35624"] },
       { name: "Bifidobacterium breve", origin: "human", source: "Human infant intestine", notes: "Predominant in infant guts. Research links it to cognitive support, weight management, and skin health.", aliases: ["B. breve"], popular_strains: ["MCC1274", "M-16V", "B-3", "BR03"] },
       { name: "Bifidobacterium bifidum", origin: "human", source: "Human intestine", notes: "One of the first colonizers of the human gut. Supports gut barrier integrity and immune modulation.", aliases: ["B. bifidum"], popular_strains: ["Bb-02", "BGN4", "R0071"] },
@@ -157,12 +157,12 @@
         product_name: "Human Strain™ B. adolescentis", brand: "Element Longevity",
         cfu: "8 Billion", strain_count: 1, strain_designations_listed: true,
         strains: ["Bifidobacterium adolescentis"],
-        notes: "Single-strain precision probiotic with strain designation iVS-1 (SH001). Includes GOS + XOS prebiotics for synbiotic colonization support. DNA-sequence verified, third-party tested.",
+        notes: "Single-strain precision probiotic with strain designation HS01. Includes GOS + XOS prebiotics for synbiotic colonization support. DNA-sequence verified, third-party tested.",
         isOwnProduct: true,
         highlights: [
           { icon: "🧬", title: "100% Human-Native", desc: "Every strain in this product was isolated from the healthy human gut. Resident bacteria, not tourists from soil, dairy, or animals." },
           { icon: "🎯", title: "Precision Single-Strain", desc: "One clinically studied strain at an effective dose — not a kitchen-sink blend of 10+ random species hoping something sticks." },
-          { icon: "🏷️", title: "Named Strain Designation", desc: "Uses iVS-1 (SH001) — a specific, traceable strain with published research. You know exactly what you're getting." },
+          { icon: "🏷️", title: "Named Strain Designation", desc: "Uses HS01 — a specific, traceable strain with published research. You know exactly what you're getting." },
           { icon: "🌱", title: "Synbiotic System", desc: "Built-in GOS + XOS prebiotics feed and sustain the probiotic colony — a complete seed-and-feed system in one capsule." },
         ],
       },
@@ -170,7 +170,7 @@
         product_name: "Human Strain™ B. longum", brand: "Element Longevity",
         cfu: "8 Billion", strain_count: 1, strain_designations_listed: true,
         strains: ["Bifidobacterium longum"],
-        notes: "Single-strain precision psychobiotic with strain designation SH015. Targets gut-brain axis support for mood, stress resilience, and sleep. Includes GOS + XOS prebiotics.",
+        notes: "Single-strain precision psychobiotic with strain designation HS02. Targets gut-brain axis support for mood, stress resilience, and sleep. Includes GOS + XOS prebiotics.",
         isOwnProduct: true,
         highlights: [
           { icon: "🧬", title: "100% Human-Native", desc: "B. longum is one of the most studied human-native species with over 280 published studies on key strains." },
@@ -195,12 +195,12 @@
         product_name: "Holy Cow! Once-Daily Lactose Digestion", brand: "Element Longevity",
         cfu: "10 Billion", strain_count: 2, strain_designations_listed: true,
         strains: ["Bifidobacterium adolescentis", "Bifidobacterium longum"],
-        notes: "Clinically studied B. adolescentis iVS-1 (SH001) + B. longum SH015. Trains the gut to produce its own beta-galactosidase enzyme for 24-hour lactose digestion support — not a per-meal enzyme pill.",
+        notes: "Clinically studied B. adolescentis HS01 + B. longum HS02. Trains the gut to produce its own beta-galactosidase enzyme for 24-hour lactose digestion support — not a per-meal enzyme pill.",
         isOwnProduct: true,
         highlights: [
           { icon: "🧬", title: "100% Human-Native", desc: "Both strains isolated from the healthy human gut. No animal, dairy, or soil organisms." },
           { icon: "⏰", title: "24-Hour Coverage", desc: "Unlike enzyme pills that only work per-meal, this trains your gut to produce its own lactase around the clock. One capsule with breakfast." },
-          { icon: "🎯", title: "Named Strain Designations", desc: "iVS-1 (SH001) and SH015 — specific, published strains you can verify. Not generic species-level labeling." },
+          { icon: "🎯", title: "Named Strain Designations", desc: "HS01 and HS02 — specific, published strains you can verify. Not generic species-level labeling." },
           { icon: "🔬", title: "Clinically Studied", desc: "Core strain backed by a published randomized controlled trial demonstrating lactose digestion improvement." },
         ],
       },
@@ -250,12 +250,40 @@
       });
     }
 
+    // ═══════════════════════════════════════════════════
+    // CACHING — saves API results so repeat searches are free & instant
+    // ═══════════════════════════════════════════════════
+    const CACHE_PREFIX = "hs_cache_";
+    const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    function getCached(key) {
+      try {
+        const raw = localStorage.getItem(CACHE_PREFIX + key);
+        if (!raw) return null;
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem(CACHE_PREFIX + key); return null; }
+        return data;
+      } catch { return null; }
+    }
+
+    function setCache(key, data) {
+      try { localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ data, ts: Date.now() })); } catch {}
+    }
+
+    function cacheKey(name) { return name.toLowerCase().trim().replace(/[^a-z0-9]/g, "_"); }
+
     async function callAPI(body) {
       const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       return res.json();
     }
 
     async function lookupProduct(productName) {
+      // Check browser cache first
+      const key = cacheKey(productName);
+      const cached = getCached(key);
+      if (cached) return cached;
+
+      // Check server cache (returns cached result or proxies to Anthropic)
       const data = await callAPI({
         model: "claude-sonnet-4-20250514", max_tokens: 1000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
@@ -263,7 +291,11 @@
       });
       const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
       const m = text.match(/\{[\s\S]*\}/);
-      if (m) return JSON.parse(m[0]);
+      if (m) {
+        const result = JSON.parse(m[0]);
+        setCache(key, result); // Save to browser cache
+        return result;
+      }
       throw new Error("Could not parse");
     }
 
