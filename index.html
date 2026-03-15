@@ -26,10 +26,46 @@
     @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     * { box-sizing: border-box; margin: 0; }
-    body { background: var(--bg-primary); font-family: 'DM Sans', -apple-system, sans-serif; color: var(--text-primary); }
+    body { background: var(--bg-primary); font-family: 'DM Sans', -apple-system, sans-serif; color: var(--text-primary); -webkit-font-smoothing: antialiased; }
+    input { -webkit-appearance: none; -moz-appearance: none; appearance: none; font-family: inherit; }
+    button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
     input::placeholder { color: var(--text-tertiary); }
     a { color: inherit; }
     #root { min-height: 100vh; }
+    
+    /* Mobile optimizations */
+    .hero-search-row { display: flex; gap: 10px; }
+    .hero-search-input { flex: 1; padding: 16px 18px; font-size: 16px; border-radius: 12px; border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); outline: none; font-family: inherit; }
+    .hero-search-input:focus { border-color: var(--accent); }
+    .hero-search-btn { padding: 16px 28px; border-radius: 12px; border: none; cursor: pointer; font-size: 16px; font-weight: 700; white-space: nowrap; transition: all 0.2s ease; font-family: inherit; }
+    .analysis-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+    .analysis-stats { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+    .issues-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .strain-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 12px; }
+    .strain-row-db { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; }
+    .autocomplete-row { display: flex; gap: 10px; max-width: 460px; margin: 0 auto; }
+    .search-card { padding: 24px 28px; }
+    .cta-box { padding: 32px 28px; }
+    
+    @media (max-width: 600px) {
+      .hero-search-row { flex-direction: column; }
+      .hero-search-btn { width: 100%; padding: 14px 20px; }
+      .analysis-header { flex-direction: column; align-items: center; text-align: center; }
+      .analysis-stats { justify-content: center; }
+      .issues-grid { grid-template-columns: 1fr; }
+      .strain-row { gap: 10px; padding: 12px 14px; flex-wrap: wrap; }
+      .strain-row-db { gap: 8px; padding: 10px 12px; }
+      .strain-row-db .origin-badge-mobile { display: none; }
+      .autocomplete-row { flex-direction: column; }
+      .autocomplete-row button { width: 100%; }
+      .search-card { padding: 18px 16px; }
+      .cta-box { padding: 24px 18px; }
+      .cta-box p:first-child { font-size: 17px !important; }
+    }
+    @media (max-width: 380px) {
+      .strain-row { padding: 10px 10px; gap: 8px; }
+      .strain-row-db { padding: 8px 10px; gap: 6px; }
+    }
   </style>
 </head>
 <body>
@@ -189,11 +225,11 @@
       return <div style={{animation:"fadeSlideIn 0.4s ease"}}>
         <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:14,fontWeight:600,cursor:"pointer",padding:"0 0 24px"}}>← Analyze another product</button>
         <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:"28px",marginBottom:20}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:20}}>
+          <div className="analysis-header">
             <div style={{flex:1,minWidth:200}}>
               <p style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 6px"}}>{productData.brand||""}</p>
               <h2 style={{fontSize:22,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>{productData.product_name}</h2>
-              <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:13,color:"var(--text-secondary)"}}>
+              <div className="analysis-stats">
                 {productData.cfu && <span><strong>{productData.cfu}</strong> CFU</span>}
                 <span><strong>{total}</strong> strains</span>
                 <span><strong>{humanCount}</strong> human-native</span>
@@ -205,7 +241,7 @@
         </div>
         {issues.length > 0 && <div style={{marginBottom:20}}>
           <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>What we found</h3>
-          <div style={{display:"grid",gap:10,gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))"}}>
+          <div className="issues-grid">
             {issues.map((issue,i) => <div key={i} style={{background:"rgba(224,85,85,0.06)",border:"1px solid rgba(224,85,85,0.15)",borderRadius:12,padding:"16px 18px"}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{fontSize:18}}>{issue.icon}</span><span style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{issue.title}</span></div>
               <p style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.6,margin:0}}>{issue.desc}</p>
@@ -214,9 +250,9 @@
         </div>}
         <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>Strain-by-strain breakdown</h3>
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
-          {classifiedStrains.map((strain,i) => { const c = ORIGIN_CONFIG[strain.origin]||ORIGIN_CONFIG.unknown; return <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",background:c.bgColor,border:`1px solid ${c.borderColor}`,borderRadius:12,animation:`fadeSlideIn 0.3s ease ${i*0.04}s both`}}><span style={{fontSize:20,flexShrink:0}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{strain.name}</div><div style={{fontSize:12,color:c.color,fontWeight:500}}>{c.tagline} · {strain.source}</div></div><OriginBadge origin={strain.origin} small /></div>; })}
+          {classifiedStrains.map((strain,i) => { const c = ORIGIN_CONFIG[strain.origin]||ORIGIN_CONFIG.unknown; return <div key={i} className="strain-row" style={{background:c.bgColor,border:`1px solid ${c.borderColor}`,animation:`fadeSlideIn 0.3s ease ${i*0.04}s both`}}><span style={{fontSize:20,flexShrink:0}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{strain.name}</div><div style={{fontSize:12,color:c.color,fontWeight:500}}>{c.tagline} · {strain.source}</div></div><OriginBadge origin={strain.origin} small /></div>; })}
         </div>
-        <div style={{padding:"32px 28px",borderRadius:16,textAlign:"center",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)"}}>
+        <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)"}}>
           <p style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>🧬 Ready for a probiotic that belongs in your body?</p>
           <p style={{fontSize:14,color:"var(--text-secondary)",margin:"0 0 20px",lineHeight:1.6}}>Human Strain™ uses only species isolated from healthy humans.<br/>Residents, not tourists. Precision-dosed. Third-party tested.</p>
           <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:15,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
@@ -242,7 +278,7 @@
         </div>
         <p style={{fontSize:12,color:"var(--text-tertiary)",marginBottom:12}}>{results.length} result{results.length!==1?"s":""}</p>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {results.map((s,i) => { const c = ORIGIN_CONFIG[s.origin]; return <div key={s.name} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:c.bgColor,border:`1px solid ${c.borderColor}`,borderRadius:10,animation:`fadeSlideIn 0.3s ease ${i*0.03}s both`}}><span style={{fontSize:18}}>{c.emoji}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{s.name}</div><div style={{fontSize:11,color:c.color}}>{c.tagline} · {s.source}</div></div><OriginBadge origin={s.origin} small /></div>; })}
+          {results.map((s,i) => { const c = ORIGIN_CONFIG[s.origin]; return <div key={s.name} className="strain-row-db" style={{background:c.bgColor,border:`1px solid ${c.borderColor}`,animation:`fadeSlideIn 0.3s ease ${i*0.03}s both`}}><span style={{fontSize:18}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{s.name}</div><div style={{fontSize:11,color:c.color}}>{c.tagline} · {s.source}</div></div><span className="origin-badge-mobile"><OriginBadge origin={s.origin} small /></span></div>; })}
         </div>
       </div>;
     }
@@ -263,7 +299,7 @@
         else if (e.key==="ArrowUp"&&show) { e.preventDefault(); setHl(i=>Math.max(i-1,0)); }
         else if (e.key==="Escape") setFocused(false);
       };
-      return <div style={{position:"relative",display:"flex",gap:10,maxWidth:460,margin:"0 auto"}}>
+      return <div className="autocomplete-row" style={{position:"relative"}}>
         <div style={{flex:1,position:"relative"}}>
           <input type="text" value={value} onChange={e=>{onChange(e.target.value);setHl(-1);}} onKeyDown={handleKey} onFocus={()=>setFocused(true)} onBlur={()=>setTimeout(()=>setFocused(false),150)} placeholder="e.g., Physician's Choice 60 Billion" autoFocus style={{width:"100%",padding:"14px 16px",fontSize:15,borderRadius:12,border:`1.5px solid ${focused?"#7C6FE0":"var(--border-color)"}`,background:"var(--bg-primary)",color:"var(--text-primary)",outline:"none"}} />
           {show && <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:50,background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.1)",overflow:"hidden"}}>
@@ -318,7 +354,7 @@
 
       const reset = () => { setProductData(null); setClassifiedStrains(null); setPendingPhoto(null); setPhotoProductName(""); setError(""); setProductQuery(""); };
 
-      return <div style={{maxWidth:720,margin:"0 auto",padding:"48px 20px 80px"}}>
+      return <div style={{maxWidth:720,margin:"0 auto",padding:"40px 16px 80px"}}>
         {/* Header */}
         <div style={{textAlign:"center",marginBottom:40}}>
           <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"8px 18px",background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:99,marginBottom:28}}>
@@ -336,10 +372,10 @@
 
         {/* Hero Search */}
         {!productData && !pendingPhoto && <>
-          <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:"24px 28px",marginBottom:8}}>
-            <div style={{display:"flex",gap:10}}>
-              <input type="text" value={productQuery} onChange={e=>setProductQuery(e.target.value)} placeholder="Search any probiotic (e.g., Physician's Choice, Seed DS-01...)" onKeyDown={e=>e.key==="Enter"&&handleProductSearch()} style={{flex:1,padding:"16px 18px",fontSize:16,borderRadius:12,border:"1.5px solid var(--border-color)",background:"var(--bg-primary)",color:"var(--text-primary)",outline:"none"}} onFocus={e=>e.target.style.borderColor="#7C6FE0"} onBlur={e=>e.target.style.borderColor="var(--border-color)"} />
-              <button onClick={handleProductSearch} disabled={!productQuery.trim()} style={{padding:"16px 28px",borderRadius:12,border:"none",cursor:"pointer",background:productQuery.trim()?"#7C6FE0":"var(--bg-tertiary)",color:productQuery.trim()?"#fff":"var(--text-tertiary)",fontSize:16,fontWeight:700,whiteSpace:"nowrap",transition:"all 0.2s ease"}}>Analyze</button>
+          <div className="search-card" style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,marginBottom:8}}>
+            <div className="hero-search-row">
+              <input type="text" className="hero-search-input" value={productQuery} onChange={e=>setProductQuery(e.target.value)} placeholder="Search any probiotic (e.g., Physician's Choice, Seed DS-01...)" onKeyDown={e=>e.key==="Enter"&&handleProductSearch()} />
+              <button className="hero-search-btn" onClick={handleProductSearch} disabled={!productQuery.trim()} style={{background:productQuery.trim()?"#7C6FE0":"var(--bg-tertiary)",color:productQuery.trim()?"#fff":"var(--text-tertiary)"}}>Analyze</button>
             </div>
             <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{fontSize:12,color:"var(--text-tertiary)",fontWeight:500}}>Try:</span>
@@ -360,7 +396,7 @@
         {error && <div style={{padding:"16px 20px",borderRadius:12,marginBottom:20,background:"rgba(224,85,85,0.08)",border:"1px solid rgba(224,85,85,0.2)",color:"#E05555",fontSize:14}}>{error}</div>}
 
         {/* Pending photo name */}
-        {pendingPhoto && <div style={{animation:"fadeSlideIn 0.4s ease",marginBottom:32}}><div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:28,textAlign:"center"}}>
+        {pendingPhoto && <div style={{animation:"fadeSlideIn 0.4s ease",marginBottom:32}}><div className="search-card" style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,textAlign:"center"}}>
           <div style={{fontSize:40,marginBottom:16}}>✅</div>
           <h3 style={{fontSize:18,fontWeight:700,color:"var(--text-primary)",marginBottom:6}}>Label scanned — {pendingPhoto.classified.length} strains found</h3>
           <p style={{fontSize:14,color:"var(--text-secondary)",marginBottom:20}}>What probiotic is this?</p>
