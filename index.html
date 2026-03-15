@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Is Your Probiotic Human Strain™? | Probiotic Origin Checker</title>
+  <meta name="description" content="Search any probiotic to find out if its strains are human-native, animal-derived, dairy, soil, or plant-based. Upload your supplement label or browse our strain database." />
+  <meta property="og:title" content="Is Your Probiotic Human Strain™?" />
+  <meta property="og:description" content="Most probiotics come from soil, dairy, or animals. Find out what's really in yours." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #F7F6FB;
+      --bg-secondary: #FFFFFF;
+      --bg-tertiary: #EEEDF5;
+      --text-primary: #1A1A2E;
+      --text-secondary: #5A5770;
+      --text-tertiary: #8A87A0;
+      --border-color: #D8D6E3;
+      --accent: #7C6FE0;
+    }
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    * { box-sizing: border-box; margin: 0; }
+    body { background: var(--bg-primary); font-family: 'DM Sans', -apple-system, sans-serif; color: var(--text-primary); }
+    input::placeholder { color: var(--text-tertiary); }
+    a { color: inherit; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-type="module">
+    const { useState, useMemo, useRef, useEffect, useCallback } = React;
+
+    // ═══════════════════════════════════════════════════
+    // API ENDPOINT — points to Cloudflare Pages Function
+    // ═══════════════════════════════════════════════════
+    const API_URL = "/api/analyze";
+
+    // ═══════════════════════════════════════════════════
+    // STRAIN DATABASE
+    // ═══════════════════════════════════════════════════
+    const STRAIN_DATABASE = [
+      { name: "Bifidobacterium adolescentis", origin: "human", source: "Human intestine", notes: "Abundant in centenarians. Declines sharply with age. Keystone species for gut-immune signaling, GABA production, and metabolic health.", aliases: ["B. adolescentis"], popular_strains: ["iVS-1 / SH001"] },
+      { name: "Bifidobacterium longum", origin: "human", source: "Human intestine", notes: "One of the most studied human-native species. Supports the gut-brain axis, HPA stress response, mood, and cognitive function. Over 280 studies on key strains like BB536.", aliases: ["B. longum"], popular_strains: ["BB536 (Morinaga)", "ATCC 15707", "SH015"] },
+      { name: "Bifidobacterium longum subsp. infantis", origin: "human", source: "Human infant intestine / breast milk", notes: "The dominant species in breastfed infants. Critical for early immune development and digestion of human milk oligosaccharides (HMOs).", aliases: ["B. infantis", "Bifidobacterium infantis"], popular_strains: ["EVC001", "M-63", "35624"] },
+      { name: "Bifidobacterium breve", origin: "human", source: "Human infant intestine", notes: "Predominant in infant guts. Research links it to cognitive support, weight management, and skin health.", aliases: ["B. breve"], popular_strains: ["MCC1274", "M-16V", "B-3", "BR03"] },
+      { name: "Bifidobacterium bifidum", origin: "human", source: "Human intestine", notes: "One of the first colonizers of the human gut. Supports gut barrier integrity and immune modulation.", aliases: ["B. bifidum"], popular_strains: ["Bb-02", "BGN4", "R0071"] },
+      { name: "Bifidobacterium dentium", origin: "human", source: "Human oral cavity", notes: "Found in the human mouth. Less commonly used in supplements.", aliases: ["B. dentium"], popular_strains: [] },
+      { name: "Bifidobacterium catenulatum", origin: "human", source: "Human intestine", notes: "Found in adult human gut. Less commercially available but genuinely human-resident.", aliases: ["B. catenulatum"], popular_strains: [] },
+      { name: "Bifidobacterium pseudocatenulatum", origin: "human", source: "Human intestine", notes: "Common human gut resident. Emerging research on metabolic health.", aliases: ["B. pseudocatenulatum"], popular_strains: [] },
+      { name: "Lactobacillus rhamnosus", origin: "human", source: "Human intestine", notes: "One of the most researched probiotic species. L. rhamnosus GG (LGG) is among the most clinically validated strains worldwide.", aliases: ["L. rhamnosus", "Lacticaseibacillus rhamnosus"], popular_strains: ["GG (LGG)", "HN001", "R0011"] },
+      { name: "Lactobacillus acidophilus", origin: "human", source: "Human intestine", notes: "A natural resident of the human small intestine. Widely used in supplements and fermented foods.", aliases: ["L. acidophilus"], popular_strains: ["La-5", "NCFM", "DDS-1", "LA-1"] },
+      { name: "Lactobacillus gasseri", origin: "human", source: "Human intestine & vaginal tract", notes: "A dominant species in the healthy human vaginal and GI microbiome. Research links it to weight management.", aliases: ["L. gasseri"], popular_strains: ["BNR17", "SBT2055", "CP2305"] },
+      { name: "Lactobacillus crispatus", origin: "human", source: "Human vaginal tract", notes: "The dominant protective species in a healthy vaginal microbiome.", aliases: ["L. crispatus"], popular_strains: ["CTV-05", "IP 174178"] },
+      { name: "Lactobacillus johnsonii", origin: "human", source: "Human intestine", notes: "Found in the human GI tract. Studied for immune modulation and pathogen resistance.", aliases: ["L. johnsonii"], popular_strains: ["La1 / NCC533"] },
+      { name: "Lactobacillus salivarius", origin: "human", source: "Human oral cavity & intestine", notes: "A natural resident of the human mouth and gut.", aliases: ["L. salivarius", "Ligilactobacillus salivarius"], popular_strains: ["UCC118", "LS-33"] },
+      { name: "Lactobacillus fermentum", origin: "human", source: "Human intestine", notes: "Found in the human GI tract and breast milk.", aliases: ["L. fermentum", "Limosilactobacillus fermentum"], popular_strains: ["ME-3", "CECT5716"] },
+      { name: "Lactobacillus reuteri", origin: "human", source: "Human GI tract (some strains animal-derived)", notes: "Found in human GI tract, breast milk, and oral cavity. Some commercial strains originated from animal sources.", aliases: ["L. reuteri", "Limosilactobacillus reuteri"], popular_strains: ["DSM 17938", "ATCC 55730", "RC-14"] },
+      { name: "Lactobacillus casei", origin: "human", source: "Human intestine (also found in dairy)", notes: "Found in both the human gut and dairy environments. Origin depends on the specific strain.", aliases: ["L. casei", "Lacticaseibacillus casei"], popular_strains: ["Shirota", "DN-114001", "Zhang"] },
+      { name: "Lactobacillus paracasei", origin: "human", source: "Human intestine (also found in dairy)", notes: "Common in the human gut and in fermented dairy. Strain-level origin varies.", aliases: ["L. paracasei", "Lacticaseibacillus paracasei"], popular_strains: ["Lpc-37", "F19", "NCC2461"] },
+      { name: "Lactobacillus jensenii", origin: "human", source: "Human vaginal tract", notes: "A key species in healthy vaginal flora.", aliases: ["L. jensenii"], popular_strains: [] },
+      { name: "Akkermansia muciniphila", origin: "human", source: "Human intestinal mucus layer", notes: "A next-generation probiotic. Strongly linked to metabolic health and gut barrier function.", aliases: ["A. muciniphila", "Akkermansia"], popular_strains: ["WB-STR-0001"] },
+      { name: "Faecalibacterium prausnitzii", origin: "human", source: "Human intestine", notes: "One of the most abundant bacteria in the healthy human colon. A major butyrate producer.", aliases: ["F. prausnitzii"], popular_strains: [] },
+      { name: "Bifidobacterium animalis subsp. lactis", origin: "animal", source: "Animal intestine", notes: "Despite being in most mainstream probiotics (including Seed DS-01), this species was originally isolated from animal intestines. Popular because it's cheap and shelf-stable.", aliases: ["B. lactis", "B. animalis", "Bifidobacterium lactis", "Bifidobacterium animalis"], popular_strains: ["BB-12", "HN019", "Bi-07", "B420", "BL-04", "DN-173 010 (Activia)"] },
+      { name: "Bifidobacterium animalis", origin: "animal", source: "Animal intestine", notes: "Originally isolated from animal GI tracts, not humans.", aliases: ["B. animalis"], popular_strains: [] },
+      { name: "Lactobacillus gallinarum", origin: "animal", source: "Chicken intestine", notes: "Isolated from poultry. Not a human-resident species.", aliases: ["L. gallinarum"], popular_strains: [] },
+      { name: "Enterococcus faecium", origin: "animal", source: "Animal intestine", notes: "Often used in animal feed probiotics. Some strains carry antibiotic resistance genes.", aliases: ["E. faecium"], popular_strains: ["SF68"] },
+      { name: "Lactobacillus delbrueckii subsp. bulgaricus", origin: "dairy", source: "Yogurt / dairy cultures", notes: "One of the two species that define yogurt. Evolved in dairy environments.", aliases: ["L. bulgaricus", "L. delbrueckii", "Lactobacillus bulgaricus"], popular_strains: [] },
+      { name: "Streptococcus thermophilus", origin: "dairy", source: "Heated milk / dairy cultures", notes: "A dairy starter culture. Evolved in milk processing environments.", aliases: ["S. thermophilus", "St. thermophilus"], popular_strains: ["TH-4"] },
+      { name: "Lactobacillus helveticus", origin: "dairy", source: "Dairy / cheese cultures", notes: "Named after Swiss cheese. A dairy-adapted species.", aliases: ["L. helveticus"], popular_strains: ["R0052", "LAFTI L10"] },
+      { name: "Lactococcus lactis", origin: "dairy", source: "Dairy / milk cultures", notes: "The primary species in buttermilk and cheese production.", aliases: ["L. lactis", "Lc. lactis"], popular_strains: [] },
+      { name: "Lactobacillus kefiri", origin: "dairy", source: "Kefir grains", notes: "Found in kefir grains. Not a human gut resident.", aliases: ["L. kefiri"], popular_strains: [] },
+      { name: "Propionibacterium freudenreichii", origin: "dairy", source: "Swiss cheese", notes: "The bacterium responsible for the holes in Swiss cheese.", aliases: ["P. freudenreichii"], popular_strains: ["JS", "ET-3"] },
+      { name: "Bacillus subtilis", origin: "soil", source: "Soil / environment", notes: "A soil-dwelling spore-forming bacterium. Popular for shelf stability, not because it's optimal for humans.", aliases: ["B. subtilis"], popular_strains: ["DE111", "HU58", "R0179"] },
+      { name: "Bacillus coagulans", origin: "soil", source: "Soil / environment", notes: "A soil-derived spore-former. Often marketed as 'Lactobacillus sporogenes' (incorrect). Shelf-stable but not human-native.", aliases: ["B. coagulans", "Lactobacillus sporogenes", "Heyndrickxia coagulans"], popular_strains: ["GBI-30 6086", "MTCC 5856", "SNZ 1969", "BC30"] },
+      { name: "Bacillus clausii", origin: "soil", source: "Soil / environment", notes: "A soil spore-former. Not a human gut resident.", aliases: ["B. clausii"], popular_strains: ["O/C", "T", "SIN", "N/R"] },
+      { name: "Bacillus licheniformis", origin: "soil", source: "Soil / environment", notes: "A soil bacterium. Not human-native.", aliases: ["B. licheniformis"], popular_strains: [] },
+      { name: "Bacillus megaterium", origin: "soil", source: "Soil / environment", notes: "Soil-dwelling. Not a human gut species.", aliases: ["B. megaterium"], popular_strains: [] },
+      { name: "Bacillus indicus", origin: "soil", source: "Soil / environment", notes: "A soil organism. Used in some 'spore-based' probiotic blends.", aliases: ["B. indicus"], popular_strains: ["HU36"] },
+      { name: "Lactobacillus plantarum", origin: "plant", source: "Plant material / fermented foods", notes: "Originally isolated from fermented plant material. Versatile but evolved in plant environments.", aliases: ["L. plantarum", "Lactiplantibacillus plantarum"], popular_strains: ["299v", "WCFS1", "LP01", "DR7"] },
+      { name: "Lactobacillus brevis", origin: "plant", source: "Fermented foods / plant material", notes: "Found in fermented vegetables, sourdough, and beer.", aliases: ["L. brevis", "Levilactobacillus brevis"], popular_strains: [] },
+      { name: "Lactobacillus buchneri", origin: "plant", source: "Fermented foods / silage", notes: "Found in plant fermentation. Not a human gut resident.", aliases: ["L. buchneri", "Lentilactobacillus buchneri"], popular_strains: [] },
+      { name: "Pediococcus acidilactici", origin: "plant", source: "Fermented vegetables", notes: "Used in fermented food production. Not a human gut species.", aliases: ["P. acidilactici"], popular_strains: ["UL5"] },
+      { name: "Leuconostoc mesenteroides", origin: "plant", source: "Fermented vegetables", notes: "Key organism in sauerkraut and kimchi fermentation.", aliases: ["L. mesenteroides", "Lc. mesenteroides"], popular_strains: [] },
+      { name: "Saccharomyces boulardii", origin: "plant", source: "Tropical fruit (lychee)", notes: "A beneficial yeast. Well-studied for diarrhea but it's transient, not a human-resident organism.", aliases: ["S. boulardii", "Saccharomyces boulardii CNCM I-745"], popular_strains: ["CNCM I-745", "Florastor"] },
+    ];
+
+    const ORIGIN_CONFIG = {
+      human: { label: "Human-Native", emoji: "🧬", color: "#7C6FE0", bgColor: "rgba(124,111,224,0.12)", borderColor: "rgba(124,111,224,0.3)", tagline: "Resident, not tourist." },
+      animal: { label: "Animal-Derived", emoji: "🐄", color: "#E05555", bgColor: "rgba(224,85,85,0.12)", borderColor: "rgba(224,85,85,0.3)", tagline: "From animal intestines." },
+      dairy: { label: "Dairy-Derived", emoji: "🧀", color: "#E0A855", bgColor: "rgba(224,168,85,0.12)", borderColor: "rgba(224,168,85,0.3)", tagline: "Born in a cheese vat." },
+      soil: { label: "Soil / Environmental", emoji: "🪨", color: "#8B7355", bgColor: "rgba(139,115,85,0.12)", borderColor: "rgba(139,115,85,0.3)", tagline: "From the dirt." },
+      plant: { label: "Plant / Fermented Food", emoji: "🥬", color: "#55A86B", bgColor: "rgba(85,168,107,0.12)", borderColor: "rgba(85,168,107,0.3)", tagline: "From the garden." },
+      unknown: { label: "Unknown Origin", emoji: "❓", color: "#888", bgColor: "rgba(136,136,136,0.12)", borderColor: "rgba(136,136,136,0.3)", tagline: "Not in our database yet." },
+    };
+
+    const POPULAR_PRODUCTS = [
+      "Physician's Choice 60 Billion Probiotic","Seed DS-01 Daily Synbiotic","Culturelle Daily Probiotic","Culturelle Pro Strength","Align Probiotic Extra Strength","Align Probiotic","Garden of Life Dr. Formulated Probiotics","Garden of Life Raw Probiotics","Renew Life Ultimate Flora","NOW Foods Probiotic-10","Jarrow Formulas Jarro-Dophilus EPS","Ritual Synbiotic+","Visbiome High Potency Probiotic","VSL#3 Probiotic","Florastor Daily Probiotic","Bio-Kult Advanced Probiotic","MegaSporeBiotic","Just Thrive Probiotic","Pendulum Akkermansia","Pendulum Glucose Control","Love Wellness Good Girl Probiotics","Olly Probiotic + Prebiotic","Nature's Bounty Acidophilus Probiotic","Hyperbiotics PRO-15","1MD Complete Probiotics Platinum","Ombre Healthy Gut Probiotics","Metagenics UltraFlora Balance","Ortho Molecular Ortho Biotic","Pure Encapsulations Probiotic G.I.","Amy Myers MD Probiotic Capsules","Ancient Nutrition SBO Probiotics","Sports Research Daily Probiotics","Transparent Labs Gut Health Probiotic",
+    ];
+
+    // ═══════════════════════════════════════════════════
+    // UTILITY FUNCTIONS
+    // ═══════════════════════════════════════════════════
+    function matchStrain(name) {
+      const q = name.toLowerCase().trim();
+      for (const s of STRAIN_DATABASE) {
+        if (s.name.toLowerCase() === q) return s;
+        for (const a of (s.aliases || [])) { if (a.toLowerCase() === q) return s; }
+      }
+      for (const s of STRAIN_DATABASE) {
+        if (s.name.toLowerCase().includes(q) || q.includes(s.name.toLowerCase())) return s;
+        for (const a of (s.aliases || [])) { if (a.toLowerCase().includes(q) || q.includes(a.toLowerCase())) return s; }
+      }
+      return null;
+    }
+
+    function classifyStrains(strainNames) {
+      return strainNames.map(name => {
+        const match = matchStrain(name);
+        if (match) return { inputName: name, ...match, matched: true };
+        return { inputName: name, name, origin: "unknown", source: "Unknown", notes: "This strain is not in our database.", matched: false };
+      });
+    }
+
+    async function callAPI(body) {
+      const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      return res.json();
+    }
+
+    async function lookupProduct(productName) {
+      const data = await callAPI({
+        model: "claude-sonnet-4-20250514", max_tokens: 1000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. Return ONLY a JSON object: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":["full species name 1",...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }],
+      });
+      const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+      throw new Error("Could not parse");
+    }
+
+    async function analyzePhoto(base64Data, mediaType) {
+      const data = await callAPI({
+        model: "claude-sonnet-4-20250514", max_tokens: 1000,
+        messages: [{ role: "user", content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: base64Data } },
+          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species. Return ONLY a JSON object: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":["full species name 1",...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }
+        ] }],
+      });
+      const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+      throw new Error("Could not read label");
+    }
+
+    // ═══════════════════════════════════════════════════
+    // COMPONENTS
+    // ═══════════════════════════════════════════════════
+    function OriginBadge({ origin, small }) {
+      const c = ORIGIN_CONFIG[origin] || ORIGIN_CONFIG.unknown;
+      return <span style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:small?10:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:c.color,background:c.bgColor,border:`1px solid ${c.borderColor}`,padding:small?"2px 7px":"3px 10px",borderRadius:20,whiteSpace:"nowrap" }}><span style={{fontSize:small?11:13}}>{c.emoji}</span> {c.label}</span>;
+    }
+
+    function ScoreRing({ humanCount, total }) {
+      const pct = total > 0 ? Math.round((humanCount / total) * 100) : 0;
+      const r = 54, circ = 2 * Math.PI * r, offset = circ - (pct / 100) * circ;
+      const color = pct >= 80 ? "#7C6FE0" : pct >= 50 ? "#E0A855" : "#E05555";
+      return <div style={{position:"relative",width:140,height:140}}><svg width="140" height="140" viewBox="0 0 140 140"><circle cx="70" cy="70" r={r} fill="none" stroke="var(--border-color)" strokeWidth="10"/><circle cx="70" cy="70" r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 70 70)" style={{transition:"stroke-dashoffset 1s ease"}}/></svg><div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:32,fontWeight:800,color}}>{pct}%</span><span style={{fontSize:11,color:"var(--text-tertiary)",fontWeight:600}}>Human</span></div></div>;
+    }
+
+    function AnalysisView({ productData, classifiedStrains, onReset }) {
+      const humanStrains = classifiedStrains.filter(s => s.origin === "human");
+      const nonHumanStrains = classifiedStrains.filter(s => s.origin !== "human");
+      const total = classifiedStrains.length, humanCount = humanStrains.length;
+      const issues = [];
+      if (total >= 8) issues.push({ icon:"🎰", title:"Kitchen-Sink Formula", desc:`${total} different species thrown together. More strains doesn't mean better results — it often means less of each strain where it counts.` });
+      if (!productData.strain_designations_listed) issues.push({ icon:"🏷️", title:"No Strain Designations", desc:"This label lists species but not specific strain IDs. Without strain designations, you can't verify which exact organisms you're getting or whether they have clinical evidence behind them." });
+      if (nonHumanStrains.some(s=>s.origin==="animal")) issues.push({ icon:"🐄", title:"Contains Animal-Derived Strains", desc:"At least one species was originally isolated from animal intestines — not the human gut. Popular because they're cheap and shelf-stable, not because they're ideal for humans." });
+      if (nonHumanStrains.some(s=>s.origin==="soil")) issues.push({ icon:"🪨", title:"Contains Soil Organisms", desc:"Includes soil-dwelling bacteria. Extremely shelf-stable, which is great for manufacturers — but they didn't evolve in your gut." });
+      if (nonHumanStrains.some(s=>s.origin==="dairy")) issues.push({ icon:"🧀", title:"Contains Dairy-Culture Strains", desc:"Includes species that evolved in dairy processing environments — yogurt and cheese production — not in the human microbiome." });
+      if (productData.cfu && parseInt(String(productData.cfu).replace(/\D/g,"")) > 50) issues.push({ icon:"📊", title:"High-CFU Marketing", desc:"A massive CFU count sounds impressive but research shows precision dosing with the right strain often outperforms blasting the gut with billions of random organisms." });
+
+      return <div style={{animation:"fadeSlideIn 0.4s ease"}}>
+        <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:14,fontWeight:600,cursor:"pointer",padding:"0 0 24px"}}>← Analyze another product</button>
+        <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:"28px",marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:20}}>
+            <div style={{flex:1,minWidth:200}}>
+              <p style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 6px"}}>{productData.brand||""}</p>
+              <h2 style={{fontSize:22,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>{productData.product_name}</h2>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:13,color:"var(--text-secondary)"}}>
+                {productData.cfu && <span><strong>{productData.cfu}</strong> CFU</span>}
+                <span><strong>{total}</strong> strains</span>
+                <span><strong>{humanCount}</strong> human-native</span>
+                <span><strong style={{color:"#E05555"}}>{total-humanCount}</strong> non-human</span>
+              </div>
+            </div>
+            <ScoreRing humanCount={humanCount} total={total} />
+          </div>
+        </div>
+        {issues.length > 0 && <div style={{marginBottom:20}}>
+          <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>What we found</h3>
+          <div style={{display:"grid",gap:10,gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))"}}>
+            {issues.map((issue,i) => <div key={i} style={{background:"rgba(224,85,85,0.06)",border:"1px solid rgba(224,85,85,0.15)",borderRadius:12,padding:"16px 18px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{fontSize:18}}>{issue.icon}</span><span style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{issue.title}</span></div>
+              <p style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.6,margin:0}}>{issue.desc}</p>
+            </div>)}
+          </div>
+        </div>}
+        <h3 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>Strain-by-strain breakdown</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+          {classifiedStrains.map((strain,i) => { const c = ORIGIN_CONFIG[strain.origin]||ORIGIN_CONFIG.unknown; return <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",background:c.bgColor,border:`1px solid ${c.borderColor}`,borderRadius:12,animation:`fadeSlideIn 0.3s ease ${i*0.04}s both`}}><span style={{fontSize:20,flexShrink:0}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{strain.name}</div><div style={{fontSize:12,color:c.color,fontWeight:500}}>{c.tagline} · {strain.source}</div></div><OriginBadge origin={strain.origin} small /></div>; })}
+        </div>
+        <div style={{padding:"32px 28px",borderRadius:16,textAlign:"center",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)"}}>
+          <p style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>🧬 Ready for a probiotic that belongs in your body?</p>
+          <p style={{fontSize:14,color:"var(--text-secondary)",margin:"0 0 20px",lineHeight:1.6}}>Human Strain™ uses only species isolated from healthy humans.<br/>Residents, not tourists. Precision-dosed. Third-party tested.</p>
+          <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:15,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
+        </div>
+      </div>;
+    }
+
+    function ManualSearch() {
+      const [query, setQuery] = useState("");
+      const [filter, setFilter] = useState("all");
+      const results = useMemo(() => {
+        let f = STRAIN_DATABASE;
+        if (filter !== "all") f = f.filter(s => s.origin === filter);
+        if (!query.trim()) return f;
+        const q = query.toLowerCase().trim();
+        return f.filter(s => s.name.toLowerCase().includes(q) || (s.aliases||[]).some(a=>a.toLowerCase().includes(q)) || (s.popular_strains||[]).some(p=>p.toLowerCase().includes(q)));
+      }, [query, filter]);
+      const filters = [{key:"all",label:"All",emoji:""},{key:"human",label:"Human",emoji:"🧬"},{key:"animal",label:"Animal",emoji:"🐄"},{key:"dairy",label:"Dairy",emoji:"🧀"},{key:"soil",label:"Soil",emoji:"🪨"},{key:"plant",label:"Plant",emoji:"🥬"}];
+      return <div>
+        <input type="text" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by strain name (e.g., Bacillus coagulans, BB-12, LGG...)" style={{width:"100%",padding:"14px 16px",fontSize:15,borderRadius:12,border:"1.5px solid var(--border-color)",background:"var(--bg-secondary)",color:"var(--text-primary)",outline:"none",marginBottom:16}} onFocus={e=>e.target.style.borderColor="#7C6FE0"} onBlur={e=>e.target.style.borderColor="var(--border-color)"} />
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+          {filters.map(f => { const isActive=filter===f.key; const cfg=f.key!=="all"?ORIGIN_CONFIG[f.key]:null; return <button key={f.key} onClick={()=>setFilter(f.key)} style={{display:"flex",alignItems:"center",gap:4,padding:"6px 12px",borderRadius:99,fontSize:12,fontWeight:600,cursor:"pointer",border:`1.5px solid ${isActive?(cfg?.color||"#7C6FE0"):"var(--border-color)"}`,background:isActive?(cfg?.bgColor||"rgba(124,111,224,0.12)"):"transparent",color:isActive?(cfg?.color||"#7C6FE0"):"var(--text-tertiary)"}}>{f.emoji && <span>{f.emoji}</span>}{f.label}</button>; })}
+        </div>
+        <p style={{fontSize:12,color:"var(--text-tertiary)",marginBottom:12}}>{results.length} result{results.length!==1?"s":""}</p>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {results.map((s,i) => { const c = ORIGIN_CONFIG[s.origin]; return <div key={s.name} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:c.bgColor,border:`1px solid ${c.borderColor}`,borderRadius:10,animation:`fadeSlideIn 0.3s ease ${i*0.03}s both`}}><span style={{fontSize:18}}>{c.emoji}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{s.name}</div><div style={{fontSize:11,color:c.color}}>{c.tagline} · {s.source}</div></div><OriginBadge origin={s.origin} small /></div>; })}
+        </div>
+      </div>;
+    }
+
+    function ProductNameAutocomplete({ value, onChange, onSubmit }) {
+      const [focused, setFocused] = useState(false);
+      const [hl, setHl] = useState(-1);
+      const suggestions = useMemo(() => {
+        if (!value.trim() || value.length < 2) return [];
+        const q = value.toLowerCase();
+        return POPULAR_PRODUCTS.filter(p => p.toLowerCase().includes(q)).slice(0, 6);
+      }, [value]);
+      const show = focused && suggestions.length > 0;
+      const select = useCallback(n => { onChange(n); setFocused(false); setHl(-1); }, [onChange]);
+      const handleKey = e => {
+        if (e.key==="Enter") { if (hl>=0&&show) select(suggestions[hl]); else onSubmit(); }
+        else if (e.key==="ArrowDown"&&show) { e.preventDefault(); setHl(i=>Math.min(i+1,suggestions.length-1)); }
+        else if (e.key==="ArrowUp"&&show) { e.preventDefault(); setHl(i=>Math.max(i-1,0)); }
+        else if (e.key==="Escape") setFocused(false);
+      };
+      return <div style={{position:"relative",display:"flex",gap:10,maxWidth:460,margin:"0 auto"}}>
+        <div style={{flex:1,position:"relative"}}>
+          <input type="text" value={value} onChange={e=>{onChange(e.target.value);setHl(-1);}} onKeyDown={handleKey} onFocus={()=>setFocused(true)} onBlur={()=>setTimeout(()=>setFocused(false),150)} placeholder="e.g., Physician's Choice 60 Billion" autoFocus style={{width:"100%",padding:"14px 16px",fontSize:15,borderRadius:12,border:`1.5px solid ${focused?"#7C6FE0":"var(--border-color)"}`,background:"var(--bg-primary)",color:"var(--text-primary)",outline:"none"}} />
+          {show && <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:50,background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.1)",overflow:"hidden"}}>
+            {suggestions.map((s,i) => { const mi=s.toLowerCase().indexOf(value.toLowerCase()); return <div key={s} onMouseDown={()=>select(s)} onMouseEnter={()=>setHl(i)} style={{padding:"10px 14px",fontSize:14,cursor:"pointer",background:i===hl?"rgba(124,111,224,0.08)":"transparent",color:"var(--text-primary)",textAlign:"left",borderBottom:i<suggestions.length-1?"1px solid var(--border-color)":"none"}}>{mi>=0?<>{s.slice(0,mi)}<strong style={{color:"#7C6FE0"}}>{s.slice(mi,mi+value.length)}</strong>{s.slice(mi+value.length)}</>:s}</div>; })}
+          </div>}
+        </div>
+        <button onClick={onSubmit} style={{padding:"14px 24px",borderRadius:12,border:"none",cursor:"pointer",background:"#7C6FE0",color:"#fff",fontSize:15,fontWeight:700,whiteSpace:"nowrap"}}>See Results</button>
+      </div>;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // MAIN APP
+    // ═══════════════════════════════════════════════════
+    function App() {
+      const [productQuery, setProductQuery] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [loadingMsg, setLoadingMsg] = useState("");
+      const [error, setError] = useState("");
+      const [productData, setProductData] = useState(null);
+      const [classifiedStrains, setClassifiedStrains] = useState(null);
+      const [pendingPhoto, setPendingPhoto] = useState(null);
+      const [photoProductName, setPhotoProductName] = useState("");
+      const fileRef = useRef(null);
+
+      const handleProductSearch = async () => {
+        if (!productQuery.trim()) return;
+        setLoading(true); setError(""); setLoadingMsg("Searching for product details...");
+        try { const d = await lookupProduct(productQuery); setLoadingMsg("Classifying strains..."); const c = classifyStrains(d.strains||[]); setProductData(d); setClassifiedStrains(c); } catch(e) { setError("Couldn't find that product. Try a more specific name."); }
+        setLoading(false);
+      };
+
+      const handlePhotoUpload = async e => {
+        const file = e.target.files?.[0]; if (!file) return;
+        setLoading(true); setError(""); setLoadingMsg("Reading your supplement label...");
+        try {
+          const b64 = await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=()=>rej(new Error("Read failed"));r.readAsDataURL(file);});
+          const d = await analyzePhoto(b64, file.type||"image/jpeg");
+          setLoadingMsg("Classifying strains...");
+          const c = classifyStrains(d.strains||[]);
+          const hasName = d.product_name && !d.product_name.toLowerCase().includes("unknown");
+          if (hasName) { setProductData(d); setClassifiedStrains(c); } else { setPendingPhoto({data:d,classified:c}); setPhotoProductName(""); }
+        } catch(e) { setError("Couldn't read that label. Try a clearer photo."); }
+        setLoading(false); if(fileRef.current) fileRef.current.value="";
+      };
+
+      const confirmPhotoName = () => {
+        if(!pendingPhoto) return;
+        const name = photoProductName.trim()||"Uploaded Product";
+        setProductData({...pendingPhoto.data, product_name:name, brand:pendingPhoto.data.brand?.toLowerCase().includes("unknown")?"":pendingPhoto.data.brand});
+        setClassifiedStrains(pendingPhoto.classified); setPendingPhoto(null); setPhotoProductName("");
+      };
+
+      const reset = () => { setProductData(null); setClassifiedStrains(null); setPendingPhoto(null); setPhotoProductName(""); setError(""); setProductQuery(""); };
+
+      return <div style={{maxWidth:720,margin:"0 auto",padding:"48px 20px 80px"}}>
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:40}}>
+          <h1 style={{fontSize:"clamp(28px,5.5vw,48px)",fontWeight:800,lineHeight:1.1,color:"var(--text-primary)",marginBottom:16}}>
+            Is Your Probiotic{" "}<span style={{color:"#7C6FE0",whiteSpace:"nowrap"}}>Human Strain™</span>?
+          </h1>
+          <p style={{fontSize:17,fontWeight:600,color:"var(--text-primary)",lineHeight:1.5,maxWidth:560,margin:"0 auto 8px"}}>
+            Your body evolved to host specific bacteria.<br/>Most probiotics come from soil, dairy, or animals.
+          </p>
+          <p style={{fontSize:14,color:"var(--text-secondary)",lineHeight:1.6,maxWidth:520,margin:"0 auto"}}>Search any probiotic product to see what's really inside.</p>
+        </div>
+
+        {/* Hero Search */}
+        {!productData && !pendingPhoto && <>
+          <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:"24px 28px",marginBottom:8}}>
+            <div style={{display:"flex",gap:10}}>
+              <input type="text" value={productQuery} onChange={e=>setProductQuery(e.target.value)} placeholder="Search any probiotic (e.g., Physician's Choice, Seed DS-01...)" onKeyDown={e=>e.key==="Enter"&&handleProductSearch()} style={{flex:1,padding:"16px 18px",fontSize:16,borderRadius:12,border:"1.5px solid var(--border-color)",background:"var(--bg-primary)",color:"var(--text-primary)",outline:"none"}} onFocus={e=>e.target.style.borderColor="#7C6FE0"} onBlur={e=>e.target.style.borderColor="var(--border-color)"} />
+              <button onClick={handleProductSearch} disabled={!productQuery.trim()} style={{padding:"16px 28px",borderRadius:12,border:"none",cursor:"pointer",background:productQuery.trim()?"#7C6FE0":"var(--bg-tertiary)",color:productQuery.trim()?"#fff":"var(--text-tertiary)",fontSize:16,fontWeight:700,whiteSpace:"nowrap",transition:"all 0.2s ease"}}>Analyze</button>
+            </div>
+            <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"var(--text-tertiary)",fontWeight:500}}>Try:</span>
+              {["Physician's Choice 60 Billion","Seed DS-01","Culturelle Daily","Align Probiotic","Garden of Life"].map(ex => <button key={ex} onClick={()=>setProductQuery(ex)} style={{padding:"5px 11px",borderRadius:99,fontSize:12,fontWeight:500,background:"var(--bg-tertiary)",border:"none",color:"var(--text-secondary)",cursor:"pointer"}}>{ex}</button>)}
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"12px 0 0",marginBottom:40}}>
+            <span style={{fontSize:13,color:"var(--text-tertiary)"}}>or</span>
+            <button onClick={()=>fileRef.current?.click()} style={{background:"none",border:"none",color:"#7C6FE0",fontSize:13,fontWeight:600,cursor:"pointer",textDecoration:"underline",display:"flex",alignItems:"center",gap:5}}>📸 Upload your supplement label</button>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{display:"none"}} />
+          </div>
+        </>}
+
+        {/* Loading */}
+        {loading && <div style={{textAlign:"center",padding:"60px 20px",marginBottom:24,animation:"pulse 1.5s ease infinite"}}><div style={{fontSize:36,marginBottom:16}}>🧬</div><p style={{fontSize:16,fontWeight:600,color:"var(--text-primary)"}}>{loadingMsg}</p><p style={{fontSize:13,color:"var(--text-tertiary)",marginTop:6}}>This takes 10–20 seconds...</p></div>}
+
+        {/* Error */}
+        {error && <div style={{padding:"16px 20px",borderRadius:12,marginBottom:20,background:"rgba(224,85,85,0.08)",border:"1px solid rgba(224,85,85,0.2)",color:"#E05555",fontSize:14}}>{error}</div>}
+
+        {/* Pending photo name */}
+        {pendingPhoto && <div style={{animation:"fadeSlideIn 0.4s ease",marginBottom:32}}><div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,padding:28,textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:16}}>✅</div>
+          <h3 style={{fontSize:18,fontWeight:700,color:"var(--text-primary)",marginBottom:6}}>Label scanned — {pendingPhoto.classified.length} strains found</h3>
+          <p style={{fontSize:14,color:"var(--text-secondary)",marginBottom:20}}>What probiotic is this?</p>
+          <ProductNameAutocomplete value={photoProductName} onChange={setPhotoProductName} onSubmit={confirmPhotoName} />
+          <button onClick={()=>{setPhotoProductName("");confirmPhotoName();}} style={{marginTop:12,background:"none",border:"none",color:"var(--text-tertiary)",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>Skip — just show the analysis</button>
+        </div></div>}
+
+        {/* Analysis */}
+        {productData && classifiedStrains && <div style={{marginBottom:40}}><AnalysisView productData={productData} classifiedStrains={classifiedStrains} onReset={reset} /></div>}
+
+        {/* Browse All Strains */}
+        {!loading && !pendingPhoto && <div>
+          <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:20}}>
+            <div style={{flex:1,height:1,background:"var(--border-color)"}}/>
+            <h2 style={{fontSize:14,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:"var(--text-tertiary)",whiteSpace:"nowrap"}}>Browse All Strains</h2>
+            <div style={{flex:1,height:1,background:"var(--border-color)"}}/>
+          </div>
+          <ManualSearch />
+        </div>}
+
+        {/* Disclaimer */}
+        <p style={{marginTop:48,fontSize:11,color:"var(--text-tertiary)",textAlign:"center",lineHeight:1.6}}>*These statements have not been evaluated by the Food and Drug Administration. This tool is for educational purposes only. Strain origin classifications are based on published isolation sources and may vary by specific strain designation.</p>
+      </div>;
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
