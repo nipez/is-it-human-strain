@@ -125,6 +125,39 @@
       { name: "Pediococcus acidilactici", origin: "plant", source: "Fermented vegetables", notes: "Used in fermented food production. Not a human gut species.", aliases: ["P. acidilactici"], popular_strains: ["UL5"] },
       { name: "Leuconostoc mesenteroides", origin: "plant", source: "Fermented vegetables", notes: "Key organism in sauerkraut and kimchi fermentation.", aliases: ["L. mesenteroides", "Lc. mesenteroides"], popular_strains: [] },
       { name: "Saccharomyces boulardii", origin: "plant", source: "Tropical fruit (lychee)", notes: "A beneficial yeast. Well-studied for diarrhea but it's transient, not a human-resident organism.", aliases: ["S. boulardii", "Saccharomyces boulardii CNCM I-745"], popular_strains: ["CNCM I-745", "Florastor"] },
+
+      // Additional human-native species
+      { name: "Lactobacillus delbrueckii", origin: "dairy", source: "Dairy cultures", notes: "Parent species of L. bulgaricus. A dairy-adapted organism.", aliases: ["L. delbrueckii subsp. delbrueckii"], popular_strains: [] },
+      { name: "Bifidobacterium angulatum", origin: "human", source: "Human intestine", notes: "Found in human feces. Less commercially common but genuinely human-resident.", aliases: ["B. angulatum"], popular_strains: [] },
+      { name: "Bifidobacterium lactis", origin: "animal", source: "Animal intestine", notes: "Subspecies of B. animalis. Originally isolated from animal intestines. Extremely common in commercial probiotics due to cost and stability — not because it's ideal for humans.", aliases: ["B. lactis"], popular_strains: ["BB-12", "HN019", "Bi-07"] },
+
+      // Additional Lactobacillus species common in mega-blends
+      { name: "Lactobacillus rhamnosus GG", origin: "human", source: "Human intestine", notes: "The most clinically studied probiotic strain in the world. Isolated from a healthy human.", aliases: ["LGG", "L. rhamnosus GG"], popular_strains: ["GG"] },
+      { name: "Lactobacillus bulgaricus", origin: "dairy", source: "Yogurt / dairy cultures", notes: "A yogurt starter culture. Evolved in dairy, not the human gut.", aliases: ["L. bulgaricus", "L. delbrueckii subsp. bulgaricus", "Lactobacillus delbrueckii subsp. bulgaricus"], popular_strains: [] },
+      { name: "Lactobacillus sporogenes", origin: "soil", source: "Soil / environment", notes: "Outdated name for Bacillus coagulans. A soil spore-former, not human-native.", aliases: ["L. sporogenes"], popular_strains: [] },
+
+      // Bacillus species found in spore-based blends
+      { name: "Bacillus pumilus", origin: "soil", source: "Soil / environment", notes: "A soil bacterium. Found in some spore-based probiotic blends.", aliases: ["B. pumilus"], popular_strains: [] },
+      { name: "Bacillus amyloliquefaciens", origin: "soil", source: "Soil / environment", notes: "A soil bacterium used in agriculture. Not human-native.", aliases: ["B. amyloliquefaciens"], popular_strains: [] },
+
+      // Streptococcus species
+      { name: "Streptococcus salivarius", origin: "human", source: "Human oral cavity", notes: "A dominant species in the healthy human mouth. Studied for oral health and ear/throat immune support.", aliases: ["S. salivarius", "Str. salivarius"], popular_strains: ["K12", "M18"] },
+
+      // Lactococcus species
+      { name: "Lactococcus lactis subsp. cremoris", origin: "dairy", source: "Dairy / cream cultures", notes: "Used in cheese and cream production. A dairy organism.", aliases: ["L. cremoris", "Lc. cremoris", "Lactococcus cremoris"], popular_strains: [] },
+      { name: "Lactococcus lactis subsp. lactis", origin: "dairy", source: "Dairy / milk cultures", notes: "A dairy starter culture used in buttermilk and cheese.", aliases: ["Lc. lactis subsp. lactis"], popular_strains: [] },
+
+      // Weissella and other fermentation organisms
+      { name: "Weissella cibaria", origin: "plant", source: "Fermented foods", notes: "Found in fermented vegetables and sourdough. Not human-native.", aliases: ["W. cibaria"], popular_strains: [] },
+      { name: "Weissella confusa", origin: "plant", source: "Fermented foods", notes: "A fermentation organism. Not a human gut resident.", aliases: ["W. confusa"], popular_strains: [] },
+
+      // Less common but found in some products
+      { name: "Bifidobacterium animalis subsp. animalis", origin: "animal", source: "Animal intestine", notes: "Isolated from animal GI tracts. Not a natural human gut resident.", aliases: ["B. animalis subsp. animalis"], popular_strains: [] },
+      { name: "Lactobacillus curvatus", origin: "plant", source: "Fermented meats / vegetables", notes: "Found in fermented sausages and sauerkraut. A food fermentation organism.", aliases: ["L. curvatus"], popular_strains: [] },
+      { name: "Lactobacillus sakei", origin: "plant", source: "Fermented meats / plant material", notes: "Used in meat fermentation. Not a human gut resident.", aliases: ["L. sakei", "Latilactobacillus sakei"], popular_strains: [] },
+      { name: "Bifidobacterium thermophilum", origin: "animal", source: "Animal intestine", notes: "Originally isolated from animal feces. Not a human-native species.", aliases: ["B. thermophilum"], popular_strains: [] },
+      { name: "Lactobacillus pentosus", origin: "plant", source: "Fermented olives / plant material", notes: "Found in fermented olives and other plant material. Not human-native.", aliases: ["L. pentosus", "Lactiplantibacillus pentosus"], popular_strains: [] },
+      { name: "Saccharomyces cerevisiae", origin: "plant", source: "Fermented foods / brewing", notes: "Baker's and brewer's yeast. Not a human gut resident — used in bread and beer production.", aliases: ["S. cerevisiae", "brewer's yeast", "baker's yeast"], popular_strains: [] },
     ];
 
     const ORIGIN_CONFIG = {
@@ -229,25 +262,55 @@
     // ═══════════════════════════════════════════════════
     // UTILITY FUNCTIONS
     // ═══════════════════════════════════════════════════
+    // Normalize strain names for better matching
+    function normalizeName(s) {
+      return s.toLowerCase().trim()
+        .replace(/\s+/g, " ")
+        .replace(/subsp\.\s*/g, "subsp. ")
+        .replace(/ssp\.\s*/g, "subsp. ")
+        // Strip strain codes at end (e.g., "Lactobacillus acidophilus NCFM" → "Lactobacillus acidophilus")
+        .replace(/\s+(NCFM|DDS-1|La-5|BB-12|GG|HN019|Bi-07|DE111|GBI-30|BC30|299v|R0052|CNCM.*|ATCC.*|DSM.*|UABla.*|UASt.*|NCC\d+|[A-Z]{1,4}-?\d+)$/i, "");
+    }
+
     function matchStrain(name) {
-      const q = name.toLowerCase().trim();
+      const q = normalizeName(name);
+      // Pass 1: exact match on name or alias
       for (const s of STRAIN_DATABASE) {
-        if (s.name.toLowerCase() === q) return s;
-        for (const a of (s.aliases || [])) { if (a.toLowerCase() === q) return s; }
+        if (normalizeName(s.name) === q) return s;
+        for (const a of (s.aliases || [])) { if (normalizeName(a) === q) return s; }
       }
+      // Pass 2: input contains db name or db name contains input
       for (const s of STRAIN_DATABASE) {
-        if (s.name.toLowerCase().includes(q) || q.includes(s.name.toLowerCase())) return s;
-        for (const a of (s.aliases || [])) { if (a.toLowerCase().includes(q) || q.includes(a.toLowerCase())) return s; }
+        const sn = normalizeName(s.name);
+        if (sn.includes(q) || q.includes(sn)) return s;
+        for (const a of (s.aliases || [])) {
+          const an = normalizeName(a);
+          if (an.includes(q) || q.includes(an)) return s;
+        }
+      }
+      // Pass 3: match on genus + species (first two words)
+      const qWords = q.split(" ").slice(0, 2).join(" ");
+      if (qWords.includes(" ")) {
+        for (const s of STRAIN_DATABASE) {
+          const sWords = normalizeName(s.name).split(" ").slice(0, 2).join(" ");
+          if (sWords === qWords) return s;
+        }
       }
       return null;
     }
 
     function classifyStrains(strainNames) {
+      // Deduplicate by matched DB name
+      const seen = new Set();
       return strainNames.map(name => {
         const match = matchStrain(name);
-        if (match) return { inputName: name, ...match, matched: true };
+        if (match) {
+          if (seen.has(match.name)) return null; // skip duplicate
+          seen.add(match.name);
+          return { inputName: name, ...match, matched: true };
+        }
         return { inputName: name, name, origin: "unknown", source: "Unknown", notes: "This strain is not in our database.", matched: false };
-      });
+      }).filter(Boolean);
     }
 
     // ═══════════════════════════════════════════════════
