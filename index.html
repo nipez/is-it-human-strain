@@ -35,9 +35,9 @@
     
     /* Mobile optimizations */
     .hero-search-row { display: flex; gap: 10px; }
-    .hero-search-input { flex: 1; padding: 16px 18px; font-size: 16px; border-radius: 12px; border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); outline: none; font-family: inherit; }
+    .hero-search-input { flex: 1; width: 100%; padding: 16px 18px; font-size: 16px; border-radius: 12px; border: 1.5px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); outline: none; font-family: inherit; min-width: 0; }
     .hero-search-input:focus { border-color: var(--accent); }
-    .hero-search-btn { padding: 16px 28px; border-radius: 12px; border: none; cursor: pointer; font-size: 16px; font-weight: 700; white-space: nowrap; transition: all 0.2s ease; font-family: inherit; }
+    .hero-search-btn { padding: 16px 28px; border-radius: 12px; border: none; cursor: pointer; font-size: 16px; font-weight: 700; white-space: nowrap; transition: all 0.2s ease; font-family: inherit; flex-shrink: 0; }
     .analysis-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
     .analysis-stats { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
     .issues-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
@@ -137,7 +137,16 @@
     };
 
     const POPULAR_PRODUCTS = [
-      "Physician's Choice 60 Billion Probiotic","Seed DS-01 Daily Synbiotic","Culturelle Daily Probiotic","Culturelle Pro Strength","Align Probiotic Extra Strength","Align Probiotic","Garden of Life Dr. Formulated Probiotics","Garden of Life Raw Probiotics","Renew Life Ultimate Flora","NOW Foods Probiotic-10","Jarrow Formulas Jarro-Dophilus EPS","Ritual Synbiotic+","Visbiome High Potency Probiotic","VSL#3 Probiotic","Florastor Daily Probiotic","Bio-Kult Advanced Probiotic","MegaSporeBiotic","Just Thrive Probiotic","Pendulum Akkermansia","Pendulum Glucose Control","Love Wellness Good Girl Probiotics","Olly Probiotic + Prebiotic","Nature's Bounty Acidophilus Probiotic","Hyperbiotics PRO-15","1MD Complete Probiotics Platinum","Ombre Healthy Gut Probiotics","Metagenics UltraFlora Balance","Ortho Molecular Ortho Biotic","Pure Encapsulations Probiotic G.I.","Amy Myers MD Probiotic Capsules","Ancient Nutrition SBO Probiotics","Sports Research Daily Probiotics","Transparent Labs Gut Health Probiotic",
+      // Element Longevity brands
+      "Human Strain B. adolescentis","Human Strain B. longum","Human Strain Complete Prebiotic","Holy Cow! Lactose Digestion Probiotic","Element Longevity",
+      // Top Amazon sellers
+      "Physician's Choice 60 Billion Probiotic","Physician's Choice Probiotics for Women","Physician's Choice Thin 30","Seed DS-01 Daily Synbiotic","Culturelle Daily Probiotic","Culturelle Pro Strength","Culturelle Kids Daily Probiotic","Align Probiotic","Align Probiotic Extra Strength","Garden of Life Dr. Formulated Probiotics","Garden of Life Raw Probiotics","Garden of Life Dr. Formulated Once Daily Women's","Renew Life Ultimate Flora","Renew Life Extra Care","NOW Foods Probiotic-10","NOW Foods Saccharomyces Boulardii",
+      // DTC / premium
+      "Ritual Synbiotic+","Pendulum Akkermansia","Pendulum Glucose Control","Pendulum Metabolic Daily","Seed DS-01","Athletic Greens AG1","Onnit Total Gut Health","Thorne FloraPro-LP","Thorne FloraSport","Transparent Labs Gut Health Probiotic",
+      // Practitioner-grade
+      "Visbiome High Potency Probiotic","VSL#3 Probiotic","Metagenics UltraFlora Balance","Ortho Molecular Ortho Biotic","Pure Encapsulations Probiotic G.I.","Pure Encapsulations Probiotic 50B","Klaire Labs Ther-Biotic Complete","Klaire Labs Ther-Biotic Synbiotic","Microbiome Labs MegaSporeBiotic","Microbiome Labs RestorFlora","Just Thrive Probiotic","Amy Myers MD Probiotic Capsules","Innate Response Flora 50-14",
+      // Mainstream retail
+      "Florastor Daily Probiotic","Bio-Kult Advanced Probiotic","Jarrow Formulas Jarro-Dophilus EPS","Jarrow Formulas Saccharomyces Boulardii","Love Wellness Good Girl Probiotics","Love Wellness Clear Skin Probiotics","Olly Probiotic + Prebiotic","Nature's Bounty Acidophilus Probiotic","Nature's Way Fortify","Hyperbiotics PRO-15","1MD Complete Probiotics Platinum","Ombre Healthy Gut Probiotics","Ancient Nutrition SBO Probiotics","Sports Research Daily Probiotics","Spring Valley Probiotic","Enzymedica Pro-Bio","Swanson Probiotics","Dr. Tobias Probiotics","Bio360 Probiotics","Healthy Origins Probiotic","Mary Ruth's Liquid Probiotic","Sakara Life Probiotics","Ora Organic Trust Your Gut","Lifted Naturals Mood Boosting Probiotic","Probulin Total Care Probiotic","BioSchwartz Advanced Strength Probiotic","Dr. Formulated Probiotics Mood+","Stonehenge Health Dynamic Biotics",
     ];
 
     // ═══════════════════════════════════════════════════
@@ -310,6 +319,41 @@
       </div>;
     }
 
+    function HeroSearch({ value, onChange, onSubmit }) {
+      const [focused, setFocused] = useState(false);
+      const [hl, setHl] = useState(-1);
+      const suggestions = useMemo(() => {
+        if (!value.trim() || value.length < 2) return [];
+        const q = value.toLowerCase();
+        return POPULAR_PRODUCTS.filter(p => p.toLowerCase().includes(q)).slice(0, 6);
+      }, [value]);
+      const show = focused && suggestions.length > 0;
+      const select = useCallback(n => { onChange(n); setFocused(false); setHl(-1); }, [onChange]);
+      const handleKey = e => {
+        if (e.key==="Enter") { if (hl>=0&&show) select(suggestions[hl]); else onSubmit(); }
+        else if (e.key==="ArrowDown"&&show) { e.preventDefault(); setHl(i=>Math.min(i+1,suggestions.length-1)); }
+        else if (e.key==="ArrowUp"&&show) { e.preventDefault(); setHl(i=>Math.max(i-1,0)); }
+        else if (e.key==="Escape") setFocused(false);
+      };
+      return <div className="search-card" style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,marginBottom:8}}>
+        <div className="hero-search-row" style={{position:"relative"}}>
+          <div style={{flex:1,position:"relative",minWidth:0}}>
+            <input type="text" className="hero-search-input" value={value} onChange={e=>{onChange(e.target.value);setHl(-1);}} onKeyDown={handleKey} onFocus={()=>setFocused(true)} onBlur={()=>setTimeout(()=>setFocused(false),150)} placeholder="Search any probiotic (e.g., Physician's Choice, Seed DS-01...)" />
+            {show && <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:50,background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.1)",overflow:"hidden"}}>
+              {suggestions.map((s,i) => { const mi=s.toLowerCase().indexOf(value.toLowerCase()); return <div key={s} onMouseDown={()=>select(s)} onMouseEnter={()=>setHl(i)} style={{padding:"12px 16px",fontSize:14,cursor:"pointer",background:i===hl?"rgba(124,111,224,0.08)":"transparent",color:"var(--text-primary)",textAlign:"left",borderBottom:i<suggestions.length-1?"1px solid var(--border-color)":"none"}}>{mi>=0?<>{s.slice(0,mi)}<strong style={{color:"#7C6FE0"}}>{s.slice(mi,mi+value.length)}</strong>{s.slice(mi+value.length)}</>:s}</div>; })}
+            </div>}
+          </div>
+          <button className="hero-search-btn" onClick={onSubmit} disabled={!value.trim()} style={{background:value.trim()?"#7C6FE0":"var(--bg-tertiary)",color:value.trim()?"#fff":"var(--text-tertiary)"}}>Analyze</button>
+        </div>
+        <div style={{marginTop:14}}>
+          <span style={{fontSize:12,color:"var(--text-tertiary)",fontWeight:500,marginBottom:6,display:"block"}}>Try:</span>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {["Physician's Choice 60 Billion","Seed DS-01","Culturelle Daily","Align Probiotic","Garden of Life"].map(ex => <button key={ex} onClick={()=>onChange(ex)} style={{padding:"5px 11px",borderRadius:99,fontSize:12,fontWeight:500,background:"var(--bg-tertiary)",border:"none",color:"var(--text-secondary)",cursor:"pointer"}}>{ex}</button>)}
+          </div>
+        </div>
+      </div>;
+    }
+
     // ═══════════════════════════════════════════════════
     // MAIN APP
     // ═══════════════════════════════════════════════════
@@ -372,16 +416,7 @@
 
         {/* Hero Search */}
         {!productData && !pendingPhoto && <>
-          <div className="search-card" style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,marginBottom:8}}>
-            <div className="hero-search-row">
-              <input type="text" className="hero-search-input" value={productQuery} onChange={e=>setProductQuery(e.target.value)} placeholder="Search any probiotic (e.g., Physician's Choice, Seed DS-01...)" onKeyDown={e=>e.key==="Enter"&&handleProductSearch()} />
-              <button className="hero-search-btn" onClick={handleProductSearch} disabled={!productQuery.trim()} style={{background:productQuery.trim()?"#7C6FE0":"var(--bg-tertiary)",color:productQuery.trim()?"#fff":"var(--text-tertiary)"}}>Analyze</button>
-            </div>
-            <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"var(--text-tertiary)",fontWeight:500}}>Try:</span>
-              {["Physician's Choice 60 Billion","Seed DS-01","Culturelle Daily","Align Probiotic","Garden of Life"].map(ex => <button key={ex} onClick={()=>setProductQuery(ex)} style={{padding:"5px 11px",borderRadius:99,fontSize:12,fontWeight:500,background:"var(--bg-tertiary)",border:"none",color:"var(--text-secondary)",cursor:"pointer"}}>{ex}</button>)}
-            </div>
-          </div>
+          <HeroSearch value={productQuery} onChange={setProductQuery} onSubmit={handleProductSearch} />
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"12px 0 0",marginBottom:40}}>
             <span style={{fontSize:13,color:"var(--text-tertiary)"}}>or</span>
             <button onClick={()=>fileRef.current?.click()} style={{background:"none",border:"none",color:"#7C6FE0",fontSize:13,fontWeight:600,cursor:"pointer",textDecoration:"underline",display:"flex",alignItems:"center",gap:5}}>📸 Upload your supplement label</button>
