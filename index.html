@@ -360,7 +360,10 @@
 
     async function callAPI(body) {
       const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      return res.json();
+      const data = await res.json();
+      console.log("API response:", JSON.stringify(data).slice(0, 500));
+      if (data.error) throw new Error(data.error.message || data.error);
+      return data;
     }
 
     async function lookupProduct(productName) {
@@ -369,20 +372,54 @@
       const cached = getCached(key);
       if (cached) return cached;
 
-      // Check server cache (returns cached result or proxies to Anthropic)
       const data = await callAPI({
-        model: "claude-sonnet-4-20250514", max_tokens: 1000,
+        model: "claude-sonnet-4-20250514", max_tokens: 2000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a JSON object: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }],
       });
-      const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
+
+      // Extract text from all content blocks (handles web_search tool_use blocks)
+      let text = "";
+      if (data.content && Array.isArray(data.content)) {
+        for (const block of data.content) {
+          if (block.type === "text" && block.text) text += block.text + "\n";
+        }
+      }
+      console.log("Extracted text:", text.slice(0, 500));
+
       const m = text.match(/\{[\s\S]*\}/);
       if (m) {
-        const result = JSON.parse(m[0]);
-        setCache(key, result); // Save to browser cache
-        return result;
+        try {
+          const result = JSON.parse(m[0]);
+          // Ensure strains is always an array
+          if (!Array.isArray(result.strains)) result.strains = [];
+          setCache(key, result);
+          return result;
+        } catch(e) { console.error("JSON parse error:", e, m[0].slice(0, 200)); }
       }
-      throw new Error("Could not parse");
+
+      // If model did a web search but hasn't returned JSON yet (stop_reason = "tool_use"),
+      // it means the API needs a second turn. For simplicity, retry without web search.
+      if (data.stop_reason === "tool_use") {
+        console.log("Got tool_use stop, retrying without web search...");
+        const retry = await callAPI({
+          model: "claude-sonnet-4-20250514", max_tokens: 2000,
+          messages: [{ role: "user", content: `List the exact probiotic strains in "${productName}". For each strain, provide origin (human/animal/dairy/soil/plant). Return ONLY JSON: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"species","origin":"human|animal|dairy|soil|plant","source":"brief description"},...],"strain_designations_listed":true/false,"notes":"..."}` }],
+        });
+        let retryText = "";
+        if (retry.content && Array.isArray(retry.content)) {
+          for (const block of retry.content) { if (block.type === "text" && block.text) retryText += block.text + "\n"; }
+        }
+        const m2 = retryText.match(/\{[\s\S]*\}/);
+        if (m2) {
+          const result = JSON.parse(m2[0]);
+          if (!Array.isArray(result.strains)) result.strains = [];
+          setCache(key, result);
+          return result;
+        }
+      }
+
+      throw new Error("Could not parse product data");
     }
 
     async function analyzePhoto(base64Data, mediaType) {
@@ -499,6 +536,37 @@
       </div>;
     }
 
+    function StrainCard({ strain, index }) {
+      const [open, setOpen] = useState(false);
+      const c = ORIGIN_CONFIG[strain.origin];
+      return <div onClick={()=>setOpen(!open)} style={{background:c.bgColor,border:`1px solid ${c.borderColor}`,borderRadius:12,padding:"14px 16px",cursor:"pointer",animation:`fadeSlideIn 0.3s ease ${index*0.03}s both`}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:18,flexShrink:0}}>{c.emoji}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{strain.name}</div>
+            <div style={{fontSize:11,color:c.color,fontWeight:500}}>{c.tagline} · {strain.source}</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{color:"var(--text-tertiary)",transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.3s ease",flexShrink:0}}><polyline points="4 6 8 10 12 6"/></svg>
+        </div>
+        {open && <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${c.borderColor}`}}>
+          {strain.notes && <p style={{fontSize:13,lineHeight:1.7,color:"var(--text-secondary)",margin:"0 0 10px"}}>{strain.notes}</p>}
+          {strain.aliases?.length > 0 && <div style={{marginBottom:8}}>
+            <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--text-tertiary)"}}>Also labeled as: </span>
+            <span style={{fontSize:13,color:"var(--text-secondary)"}}>{strain.aliases.join(", ")}</span>
+          </div>}
+          {strain.popular_strains?.length > 0 && <div style={{marginBottom:8}}>
+            <span style={{fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--text-tertiary)"}}>Common strain codes: </span>
+            <span style={{fontSize:13,color:"var(--text-secondary)"}}>{strain.popular_strains.join(", ")}</span>
+          </div>}
+          {strain.origin !== "human" && <div style={{marginTop:12,padding:"10px 14px",background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)",borderRadius:10,fontSize:13,color:"var(--text-secondary)",lineHeight:1.6}}>
+            🧬 <strong style={{color:"#7C6FE0"}}>Looking for the human-native alternative?</strong>{" "}
+            Human Strain™ products use only species isolated from healthy humans — residents, not tourists.{" "}
+            <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{color:"#7C6FE0",textDecoration:"underline",fontWeight:600}}>Learn more →</a>
+          </div>}
+        </div>}
+      </div>;
+    }
+
     function ManualSearch() {
       const [query, setQuery] = useState("");
       const [filter, setFilter] = useState("all");
@@ -517,7 +585,7 @@
         </div>
         <p style={{fontSize:12,color:"var(--text-tertiary)",marginBottom:12}}>{results.length} result{results.length!==1?"s":""}</p>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {results.map((s,i) => { const c = ORIGIN_CONFIG[s.origin]; return <div key={s.name} className="strain-row-db" style={{background:c.bgColor,border:`1px solid ${c.borderColor}`,animation:`fadeSlideIn 0.3s ease ${i*0.03}s both`}}><span style={{fontSize:18}}>{c.emoji}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)",fontStyle:"italic"}}>{s.name}</div><div style={{fontSize:11,color:c.color}}>{c.tagline} · {s.source}</div></div><span className="origin-badge-mobile"><OriginBadge origin={s.origin} small /></span></div>; })}
+          {results.map((s,i) => <StrainCard key={s.name} strain={s} index={i} />)}
         </div>
       </div>;
     }
@@ -609,7 +677,18 @@
           return;
         }
         setLoading(true); setError(""); setLoadingMsg("Searching for product details...");
-        try { const d = await lookupProduct(productQuery); setLoadingMsg("Classifying strains..."); const c = classifyStrains(d.strains||[]); setProductData(d); setClassifiedStrains(c); } catch(e) { setError("Couldn't find that product. Try a more specific name."); }
+        try { 
+          const d = await lookupProduct(productQuery); 
+          console.log("Product data:", d);
+          setLoadingMsg("Classifying strains..."); 
+          const strains = Array.isArray(d.strains) ? d.strains : [];
+          const c = classifyStrains(strains); 
+          setProductData(d); 
+          setClassifiedStrains(c); 
+        } catch(e) { 
+          console.error("Search failed:", e); 
+          setError("Couldn't find that product: " + e.message); 
+        }
         setLoading(false);
       };
 
