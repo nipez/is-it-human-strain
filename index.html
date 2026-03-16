@@ -396,7 +396,7 @@
       const data = await callAPI({
         model: "claude-sonnet-4-20250514", max_tokens: 4096,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a raw JSON object with NO markdown fences: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON, no backticks.` }],
+        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count, number of strains, and the "Other Ingredients" list from the label. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a raw JSON object with NO markdown fences: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"other_ingredients":"comma-separated list of non-probiotic ingredients","notes":"..."}\nUse full scientific species names. Return ONLY valid JSON, no backticks.` }],
       });
 
       // Extract text from all content blocks (handles web_search tool_use blocks)
@@ -443,7 +443,7 @@
         model: "claude-sonnet-4-20250514", max_tokens: 4096,
         messages: [{ role: "user", content: [
           { type: "image", source: { type: "base64", media_type: mediaType, data: base64Data } },
-          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a raw JSON object with NO markdown fences: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON, no backticks.` }
+          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species and the "Other Ingredients" list. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a raw JSON object with NO markdown fences: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"other_ingredients":"comma-separated list of non-probiotic ingredients","notes":"..."}\nUse full scientific species names. Return ONLY valid JSON, no backticks.` }
         ] }],
       });
       let text = "";
@@ -466,6 +466,87 @@
       return <span style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:small?13:14,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:c.color,background:c.bgColor,border:`1px solid ${c.borderColor}`,padding:small?"4px 10px":"6px 14px",borderRadius:20,whiteSpace:"nowrap" }}><span style={{fontSize:small?16:18}}>{c.emoji}</span> {c.label}</span>;
     }
 
+    // ═══════════════════════════════════════════════════
+    // GRADING SYSTEM
+    // ═══════════════════════════════════════════════════
+    function getGrade(productData, classifiedStrains) {
+      const total = classifiedStrains.length;
+      const humanCount = classifiedStrains.filter(s => s.origin === "human").length;
+      const pct = total > 0 ? (humanCount / total) * 100 : 0;
+      let score = pct; // base score from human %
+
+      // Bonuses
+      if (productData.strain_designations_listed) score += 10;
+      if (productData.isOwnProduct) score += 5;
+      if (total <= 3 && total > 0) score += 5; // precision formula bonus
+
+      // Penalties
+      if (total >= 10) score -= 10; // kitchen sink
+      if (total >= 20) score -= 10; // mega kitchen sink
+      if (!productData.strain_designations_listed && !productData.isOwnProduct) score -= 10;
+      const redFlags = (productData.ingredient_flags || []).length;
+      score -= redFlags * 5;
+
+      if (score >= 95) return { grade: "A+", color: "#7C6FE0", bg: "rgba(124,111,224,0.12)" };
+      if (score >= 85) return { grade: "A", color: "#7C6FE0", bg: "rgba(124,111,224,0.1)" };
+      if (score >= 75) return { grade: "B+", color: "#55A86B", bg: "rgba(85,168,107,0.1)" };
+      if (score >= 65) return { grade: "B", color: "#55A86B", bg: "rgba(85,168,107,0.08)" };
+      if (score >= 55) return { grade: "C+", color: "#E0A855", bg: "rgba(224,168,85,0.1)" };
+      if (score >= 45) return { grade: "C", color: "#E0A855", bg: "rgba(224,168,85,0.08)" };
+      if (score >= 35) return { grade: "D+", color: "#E08855", bg: "rgba(224,136,85,0.1)" };
+      if (score >= 25) return { grade: "D", color: "#E08855", bg: "rgba(224,136,85,0.08)" };
+      return { grade: "F", color: "#E05555", bg: "rgba(224,85,85,0.1)" };
+    }
+
+    function GradeBadge({ grade, size }) {
+      const sz = size || 80;
+      return <div style={{
+        width: sz, height: sz, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center",
+        background: grade.bg, border: `2px solid ${grade.color}`,
+      }}>
+        <span style={{ fontSize: sz * 0.45, fontWeight: 900, color: grade.color }}>{grade.grade}</span>
+      </div>;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // SMART RECOMMENDATION ENGINE
+    // ═══════════════════════════════════════════════════
+    const RECOMMENDATIONS = {
+      "gut-brain": { product: "Human Strain™ B. longum", desc: "Clinically linked to gut-brain axis support — mood, stress resilience, and sleep quality.", url: "https://humanstrain.com", match: ["mood","brain","stress","sleep","cognitive","anxiety","mental","psychobiotic","gut-brain"] },
+      "lactose": { product: "Holy Cow! Lactose Digestion", desc: "Once-daily probiotic that trains your gut to digest lactose 24/7 — not a per-meal enzyme pill.", url: "https://humanstrain.com", match: ["lactose","dairy","lactase","digestion","digestive","bloating","gas"] },
+      "general": { product: "Human Strain™ B. adolescentis", desc: "The centenarian strain — abundant in long-lived populations, declines with age. Keystone species for gut-immune signaling.", url: "https://humanstrain.com", match: ["general","gut","immune","health","daily","probiotic","digestive"] },
+      "women": { product: "Human Strain™ (Women's line coming soon)", desc: "Human-native strains for the gut-skin-hair axis. Join the waitlist.", url: "https://humanstrain.com", match: ["women","vaginal","uti","urinary","feminine","ph balance","beauty","skin","hair"] },
+    };
+
+    function getRecommendation(productData) {
+      const text = [productData.product_name, productData.brand, productData.notes || ""].join(" ").toLowerCase();
+      for (const [key, rec] of Object.entries(RECOMMENDATIONS)) {
+        if (rec.match.some(kw => text.includes(kw))) return rec;
+      }
+      return RECOMMENDATIONS.general;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // INGREDIENT RED FLAGS
+    // ═══════════════════════════════════════════════════
+    const INGREDIENT_FLAGS = [
+      { name: "Titanium Dioxide", icon: "⚠️", desc: "A whitening agent banned in the EU as a food additive since 2022 due to genotoxicity concerns.", match: ["titanium dioxide","tio2","e171"] },
+      { name: "Magnesium Stearate", icon: "💊", desc: "A common flow agent used in manufacturing. While generally safe, it's a filler that adds no health benefit and some studies suggest it may reduce nutrient absorption.", match: ["magnesium stearate"] },
+      { name: "Silicon Dioxide", icon: "💊", desc: "An anti-caking agent. Generally safe but unnecessary — a filler ingredient.", match: ["silicon dioxide","silica"] },
+      { name: "Maltodextrin", icon: "🍬", desc: "A processed starch that can spike blood sugar. Often used as a cheap filler in supplements. Can also feed pathogenic bacteria.", match: ["maltodextrin"] },
+      { name: "Artificial Colors", icon: "🎨", desc: "Synthetic dyes with no nutritional value. Some are linked to hyperactivity in children and other concerns.", match: ["red 40","blue 1","blue 2","yellow 5","yellow 6","fd&c","artificial color"] },
+      { name: "Carrageenan", icon: "⚠️", desc: "A thickening agent derived from seaweed. Research links it to gut inflammation and intestinal damage in some studies.", match: ["carrageenan"] },
+      { name: "Hydrogenated Oils", icon: "⚠️", desc: "Trans fats that are harmful to cardiovascular health. Should not be in a health supplement.", match: ["hydrogenated","partially hydrogenated"] },
+      { name: "High Fructose Corn Syrup", icon: "🍬", desc: "A cheap sweetener linked to metabolic dysfunction and gut dysbiosis.", match: ["high fructose corn syrup","hfcs"] },
+      { name: "Artificial Sweeteners", icon: "🍬", desc: "Some artificial sweeteners have been shown to negatively alter gut microbiome composition — counterproductive in a probiotic.", match: ["sucralose","aspartame","acesulfame","ace-k","saccharin"] },
+      { name: "Soy Lecithin", icon: "🫘", desc: "Common allergen and often derived from GMO soybeans. Unnecessary filler in a probiotic.", match: ["soy lecithin"] },
+    ];
+
+    function flagIngredients(productData) {
+      const text = (productData.other_ingredients || productData.notes || "").toLowerCase();
+      return INGREDIENT_FLAGS.filter(f => f.match.some(m => text.includes(m)));
+    }
+
     function ScoreRing({ humanCount, total }) {
       const pct = total > 0 ? Math.round((humanCount / total) * 100) : 0;
       const r = 54, circ = 2 * Math.PI * r, offset = circ - (pct / 100) * circ;
@@ -473,26 +554,34 @@
       return <div style={{position:"relative",width:140,height:140}}><svg width="140" height="140" viewBox="0 0 140 140"><circle cx="70" cy="70" r={r} fill="none" stroke="var(--border-color)" strokeWidth="10"/><circle cx="70" cy="70" r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 70 70)" style={{transition:"stroke-dashoffset 1s ease"}}/></svg><div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:32,fontWeight:800,color}}>{pct}%</span><span style={{fontSize:18,color:"var(--text-tertiary)",fontWeight:600}}>Human</span></div></div>;
     }
 
-    function AnalysisView({ productData, classifiedStrains, onReset }) {
+    function AnalysisView({ productData, classifiedStrains, onReset, onCompare }) {
       const humanStrains = classifiedStrains.filter(s => s.origin === "human");
       const nonHumanStrains = classifiedStrains.filter(s => s.origin !== "human");
       const total = classifiedStrains.length, humanCount = humanStrains.length;
       const isOwn = productData.isOwnProduct;
       const highlights = productData.highlights || [];
+      const grade = getGrade(productData, classifiedStrains);
+      const recommendation = !isOwn ? getRecommendation(productData) : null;
+      const ingredientFlags = !isOwn ? flagIngredients(productData) : [];
 
       // Only generate issues for non-own products
       const issues = [];
       if (!isOwn) {
         if (total >= 8) issues.push({ icon:"🎰", title:"Kitchen-Sink Formula", desc:`${total} different species thrown together. More strains doesn't mean better results — it often means less of each strain where it counts.` });
         if (!productData.strain_designations_listed) issues.push({ icon:"🏷️", title:"No Strain Designations", desc:"This label lists species but not specific strain IDs. Without strain designations, you can't verify which exact organisms you're getting or whether they have clinical evidence behind them." });
-        if (nonHumanStrains.some(s=>s.origin==="animal")) issues.push({ icon:"🐄", title:"Contains Animal-Derived Strains", desc:"At least one species was originally isolated from animal intestines — not the human gut. Popular because they're cheap and shelf-stable, not because they're ideal for humans." });
+        if (nonHumanStrains.some(s=>s.origin==="animal")) issues.push({ icon:"🐄", title:"Contains Animal-Derived Strains", desc:"At least one species was originally isolated from animal sources — not from the human gut. Popular because they're cheap and shelf-stable, not because they're ideal for humans." });
         if (nonHumanStrains.some(s=>s.origin==="soil")) issues.push({ icon:"🪨", title:"Contains Soil Organisms", desc:"Includes soil-dwelling bacteria. Extremely shelf-stable, which is great for manufacturers — but they didn't evolve in your gut." });
         if (nonHumanStrains.some(s=>s.origin==="dairy")) issues.push({ icon:"🧀", title:"Contains Dairy-Culture Strains", desc:"Includes species that evolved in dairy processing environments — yogurt and cheese production — not in the human microbiome." });
         if (productData.cfu && parseInt(String(productData.cfu).replace(/\D/g,"")) > 50) issues.push({ icon:"📊", title:"High-CFU Marketing", desc:"A massive CFU count sounds impressive but research shows precision dosing with the right strain often outperforms blasting the gut with billions of random organisms." });
       }
 
       return <div style={{animation:"fadeSlideIn 0.4s ease"}}>
-        <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:"0 0 24px"}}>← Analyze another product</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:10}}>
+          <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:0}}>← Analyze another product</button>
+          {!isOwn && onCompare && <button onClick={onCompare} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:"8px 16px",borderRadius:99}}>⚖️ Compare with another</button>}
+        </div>
+
+        {/* Product Header with Grade */}
         <div style={{background: isOwn ? "rgba(124,111,224,0.06)" : "var(--bg-secondary)",border:`1px solid ${isOwn ? "rgba(124,111,224,0.2)" : "var(--border-color)"}`,borderRadius:16,padding:"28px",marginBottom:20}}>
           <div className="analysis-header">
             <div style={{flex:1,minWidth:200}}>
@@ -507,11 +596,14 @@
               </div>
               {productData.notes && <p style={{fontSize:18,color:"var(--text-secondary)",lineHeight:1.6,marginTop:10}}>{productData.notes}</p>}
             </div>
-            {total > 0 && <ScoreRing humanCount={humanCount} total={total} />}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+              {total > 0 && <ScoreRing humanCount={humanCount} total={total} />}
+              <GradeBadge grade={grade} size={64} />
+            </div>
           </div>
         </div>
 
-        {/* Highlights for own products (green) */}
+        {/* Highlights for own products */}
         {highlights.length > 0 && <div style={{marginBottom:20}}>
           <h3 style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C6FE0",margin:"0 0 12px"}}>What makes this different</h3>
           <div className="issues-grid">
@@ -522,7 +614,7 @@
           </div>
         </div>}
 
-        {/* Issues for competitor products (red) */}
+        {/* Issues for competitor products */}
         {issues.length > 0 && <div style={{marginBottom:20}}>
           <h3 style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>What we found</h3>
           <div className="issues-grid">
@@ -533,7 +625,18 @@
           </div>
         </div>}
 
-        {/* Strain breakdown — only show if there are strains */}
+        {/* Ingredient Red Flags */}
+        {ingredientFlags.length > 0 && <div style={{marginBottom:20}}>
+          <h3 style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#E08855",margin:"0 0 12px"}}>Ingredient Red Flags</h3>
+          <div className="issues-grid">
+            {ingredientFlags.map((flag,i) => <div key={i} style={{background:"rgba(224,136,85,0.06)",border:"1px solid rgba(224,136,85,0.15)",borderRadius:12,padding:"16px 18px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{fontSize:18}}>{flag.icon}</span><span style={{fontSize:18,fontWeight:700,color:"var(--text-primary)"}}>{flag.name}</span></div>
+              <p style={{fontSize:18,color:"var(--text-secondary)",lineHeight:1.6,margin:0}}>{flag.desc}</p>
+            </div>)}
+          </div>
+        </div>}
+
+        {/* Strain breakdown */}
         {classifiedStrains.length > 0 && <>
           <h3 style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--text-tertiary)",margin:"0 0 12px"}}>Strain-by-strain breakdown</h3>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
@@ -541,20 +644,77 @@
           </div>
         </>}
 
-        {/* CTA — different for own vs competitor */}
+        {/* Smart Recommendation CTA */}
         {isOwn ? (
           <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"#1A1A2E",border:"none"}}>
             <p style={{fontSize:20,fontWeight:700,color:"#FFFFFF",margin:"0 0 8px"}}>🧬 This is what precision probiotics look like.</p>
             <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 20px",lineHeight:1.6}}>Human-native strains. Clinically studied. No fillers, no tourists.<br/>Now compare it to what you've been taking.</p>
             <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
           </div>
-        ) : (
-          <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"#1A1A2E",border:"none"}}>
-            <p style={{fontSize:20,fontWeight:700,color:"#FFFFFF",margin:"0 0 8px"}}>🧬 Ready for a probiotic that belongs in your body?</p>
-            <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 20px",lineHeight:1.6}}>Human Strain™ uses only species isolated from healthy humans.<br/>Residents, not tourists. Precision-dosed. Third-party tested.</p>
-            <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
+        ) : recommendation ? (
+          <div className="cta-box" style={{borderRadius:16,background:"#1A1A2E",border:"none"}}>
+            <p style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.4)",margin:"0 0 12px"}}>What to take instead</p>
+            <p style={{fontSize:22,fontWeight:700,color:"#FFFFFF",margin:"0 0 8px"}}>🧬 {recommendation.product}</p>
+            <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 20px",lineHeight:1.6}}>{recommendation.desc}</p>
+            <a href={recommendation.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop {recommendation.product.split(" —")[0]}</a>
           </div>
-        )}
+        ) : null}
+      </div>;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // SIDE-BY-SIDE COMPARISON VIEW
+    // ═══════════════════════════════════════════════════
+    function ComparisonView({ product1, strains1, product2, strains2, onReset }) {
+      const grade1 = getGrade(product1, strains1);
+      const grade2 = getGrade(product2, strains2);
+      const human1 = strains1.filter(s=>s.origin==="human").length;
+      const human2 = strains2.filter(s=>s.origin==="human").length;
+      const total1 = strains1.length, total2 = strains2.length;
+      const pct1 = total1 > 0 ? Math.round((human1/total1)*100) : 0;
+      const pct2 = total2 > 0 ? Math.round((human2/total2)*100) : 0;
+
+      const rows = [
+        { label: "Grade", v1: grade1.grade, v2: grade2.grade, c1: grade1.color, c2: grade2.color },
+        { label: "Human-Native", v1: `${pct1}%`, v2: `${pct2}%`, c1: pct1>=70?"#7C6FE0":"#E05555", c2: pct2>=70?"#7C6FE0":"#E05555" },
+        { label: "Total Strains", v1: total1, v2: total2 },
+        { label: "Human Strains", v1: human1, v2: human2, c1:"#7C6FE0", c2:"#7C6FE0" },
+        { label: "Non-Human", v1: total1-human1, v2: total2-human2, c1: (total1-human1)>0?"#E05555":"#7C6FE0", c2: (total2-human2)>0?"#E05555":"#7C6FE0" },
+        { label: "CFU", v1: product1.cfu||"N/A", v2: product2.cfu||"N/A" },
+        { label: "Strain IDs Listed", v1: product1.strain_designations_listed?"Yes":"No", v2: product2.strain_designations_listed?"Yes":"No", c1: product1.strain_designations_listed?"#55A86B":"#E05555", c2: product2.strain_designations_listed?"#55A86B":"#E05555" },
+      ];
+
+      return <div style={{animation:"fadeSlideIn 0.4s ease"}}>
+        <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:"0 0 24px"}}>← Start over</button>
+
+        {/* Header Row */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:24}}>
+          {[{p:product1,g:grade1,pct:pct1},{p:product2,g:grade2,pct:pct2}].map(({p,g,pct},i) => (
+            <div key={i} style={{background: p.isOwnProduct ? "rgba(124,111,224,0.06)" : "var(--bg-secondary)",border:`1px solid ${p.isOwnProduct?"rgba(124,111,224,0.2)":"var(--border-color)"}`,borderRadius:16,padding:"20px",textAlign:"center"}}>
+              <GradeBadge grade={g} size={56} />
+              <h3 style={{fontSize:18,fontWeight:700,color:"var(--text-primary)",margin:"12px 0 4px"}}>{p.product_name}</h3>
+              <p style={{fontSize:18,color: p.isOwnProduct ? "#7C6FE0" : "var(--text-tertiary)",fontWeight:600,margin:0}}>{p.brand||""}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Comparison Table */}
+        <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16,overflow:"hidden",marginBottom:24}}>
+          {rows.map((row,i) => (
+            <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 2fr 2fr",alignItems:"center",padding:"14px 20px",borderBottom:i<rows.length-1?"1px solid var(--border-color)":"none",background:i%2===0?"transparent":"rgba(0,0,0,0.02)"}}>
+              <span style={{fontSize:18,fontWeight:600,color:"var(--text-tertiary)"}}>{row.label}</span>
+              <span style={{fontSize:18,fontWeight:700,color:row.c1||"var(--text-primary)",textAlign:"center"}}>{row.v1}</span>
+              <span style={{fontSize:18,fontWeight:700,color:row.c2||"var(--text-primary)",textAlign:"center"}}>{row.v2}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="cta-box" style={{borderRadius:16,textAlign:"center",background:"#1A1A2E",border:"none"}}>
+          <p style={{fontSize:20,fontWeight:700,color:"#FFFFFF",margin:"0 0 8px"}}>🧬 The difference is clear.</p>
+          <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 20px",lineHeight:1.6}}>Human Strain™ uses only species isolated from healthy humans.<br/>Residents, not tourists.</p>
+          <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
+        </div>
       </div>;
     }
 
@@ -687,6 +847,12 @@
       const [pendingPhoto, setPendingPhoto] = useState(null);
       const [photoProductName, setPhotoProductName] = useState("");
       const fileRef = useRef(null);
+      // Comparison state
+      const [compareMode, setCompareMode] = useState(false);
+      const [product1, setProduct1] = useState(null);
+      const [strains1, setStrains1] = useState(null);
+      const [product2, setProduct2] = useState(null);
+      const [strains2, setStrains2] = useState(null);
 
       const handleProductSearch = async () => {
         if (!productQuery.trim()) return;
@@ -694,8 +860,11 @@
         const known = findKnownProduct(productQuery);
         if (known) {
           const c = classifyStrains(known.strains || []);
-          setProductData(known);
-          setClassifiedStrains(c);
+          if (compareMode && product1) {
+            setProduct2(known); setStrains2(c); setProductData(null); setClassifiedStrains(null);
+          } else {
+            setProductData(known); setClassifiedStrains(c);
+          }
           return;
         }
         setLoading(true); setError(""); setLoadingMsg("Searching for product details...");
@@ -705,8 +874,11 @@
           setLoadingMsg("Classifying strains..."); 
           const strains = Array.isArray(d.strains) ? d.strains : [];
           const c = classifyStrains(strains); 
-          setProductData(d); 
-          setClassifiedStrains(c); 
+          if (compareMode && product1) {
+            setProduct2(d); setStrains2(c); setProductData(null); setClassifiedStrains(null);
+          } else {
+            setProductData(d); setClassifiedStrains(c);
+          }
         } catch(e) { 
           console.error("Search failed:", e); 
           setError("Couldn't find that product: " + e.message); 
@@ -735,7 +907,17 @@
         setClassifiedStrains(pendingPhoto.classified); setPendingPhoto(null); setPhotoProductName("");
       };
 
-      const reset = () => { setProductData(null); setClassifiedStrains(null); setPendingPhoto(null); setPhotoProductName(""); setError(""); setProductQuery(""); };
+      const reset = () => { setProductData(null); setClassifiedStrains(null); setPendingPhoto(null); setPhotoProductName(""); setError(""); setProductQuery(""); setCompareMode(false); setProduct1(null); setStrains1(null); setProduct2(null); setStrains2(null); };
+
+      const startCompare = () => {
+        // Save current product as product1, show search for product2
+        setProduct1(productData);
+        setStrains1(classifiedStrains);
+        setProductData(null);
+        setClassifiedStrains(null);
+        setProductQuery("");
+        setCompareMode(true);
+      };
 
       return <div style={{maxWidth:720,margin:"0 auto",padding:"40px 16px 80px"}}>
         {/* Header */}
@@ -754,7 +936,11 @@
         </div>
 
         {/* Hero Search */}
-        {!productData && !pendingPhoto && <>
+        {!productData && !pendingPhoto && !product2 && <>
+          {compareMode && product1 && <div style={{background:"rgba(124,111,224,0.06)",border:"1px solid rgba(124,111,224,0.2)",borderRadius:12,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+            <div><span style={{fontSize:18,fontWeight:600,color:"#7C6FE0"}}>Comparing: {product1.product_name}</span><br/><span style={{fontSize:18,color:"var(--text-secondary)"}}>Now search for the second product below</span></div>
+            <button onClick={reset} style={{background:"none",border:"1px solid var(--border-color)",borderRadius:8,padding:"6px 12px",fontSize:18,color:"var(--text-tertiary)",cursor:"pointer"}}>Cancel</button>
+          </div>}
           <HeroSearch value={productQuery} onChange={setProductQuery} onSubmit={handleProductSearch} />
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"12px 0 0",marginBottom:40}}>
             <span style={{fontSize:18,color:"var(--text-tertiary)"}}>or</span>
@@ -778,8 +964,11 @@
           <button onClick={()=>{setPhotoProductName("");confirmPhotoName();}} style={{marginTop:12,background:"none",border:"none",color:"var(--text-tertiary)",fontSize:18,cursor:"pointer",textDecoration:"underline"}}>Skip — just show the analysis</button>
         </div></div>}
 
-        {/* Analysis */}
-        {productData && classifiedStrains && <div style={{marginBottom:40}}><AnalysisView productData={productData} classifiedStrains={classifiedStrains} onReset={reset} /></div>}
+        {/* Analysis — single product */}
+        {productData && classifiedStrains && !product2 && <div style={{marginBottom:40}}><AnalysisView productData={productData} classifiedStrains={classifiedStrains} onReset={reset} onCompare={startCompare} /></div>}
+
+        {/* Comparison View — two products */}
+        {product1 && strains1 && product2 && strains2 && <div style={{marginBottom:40}}><ComparisonView product1={product1} strains1={strains1} product2={product2} strains2={strains2} onReset={reset} /></div>}
 
         {/* Browse All Strains */}
         {!loading && !pendingPhoto && <div>
