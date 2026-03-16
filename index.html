@@ -366,6 +366,27 @@
       return data;
     }
 
+    // Strip markdown fences and extract JSON
+    function extractJSON(text) {
+      let clean = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+      const m = clean.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { return JSON.parse(m[0]); } catch(e) {
+          console.warn("JSON incomplete, attempting repair...");
+          let repaired = m[0];
+          const openBraces = (repaired.match(/\{/g) || []).length;
+          const closeBraces = (repaired.match(/\}/g) || []).length;
+          const openBrackets = (repaired.match(/\[/g) || []).length;
+          const closeBrackets = (repaired.match(/\]/g) || []).length;
+          repaired = repaired.replace(/,\s*$/, "").replace(/,\s*\{[^}]*$/, "");
+          for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += "]";
+          for (let i = 0; i < openBraces - closeBraces; i++) repaired += "}";
+          try { return JSON.parse(repaired); } catch(e2) { console.error("Repair failed:", e2); }
+        }
+      }
+      return null;
+    }
+
     async function lookupProduct(productName) {
       // Check browser cache first
       const key = cacheKey(productName);
@@ -373,9 +394,9 @@
       if (cached) return cached;
 
       const data = await callAPI({
-        model: "claude-sonnet-4-20250514", max_tokens: 2000,
+        model: "claude-sonnet-4-20250514", max_tokens: 4096,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a JSON object: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }],
+        messages: [{ role: "user", content: `Find the exact probiotic strains/species listed in the supplement facts panel of this product: "${productName}". Also find the total CFU count and number of strains. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a raw JSON object with NO markdown fences: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON, no backticks.` }],
       });
 
       // Extract text from all content blocks (handles web_search tool_use blocks)
@@ -387,15 +408,11 @@
       }
       console.log("Extracted text:", text.slice(0, 500));
 
-      const m = text.match(/\{[\s\S]*\}/);
-      if (m) {
-        try {
-          const result = JSON.parse(m[0]);
-          // Ensure strains is always an array
-          if (!Array.isArray(result.strains)) result.strains = [];
-          setCache(key, result);
-          return result;
-        } catch(e) { console.error("JSON parse error:", e, m[0].slice(0, 200)); }
+      const result = extractJSON(text);
+      if (result) {
+        if (!Array.isArray(result.strains)) result.strains = [];
+        setCache(key, result);
+        return result;
       }
 
       // If model did a web search but hasn't returned JSON yet (stop_reason = "tool_use"),
@@ -403,19 +420,18 @@
       if (data.stop_reason === "tool_use") {
         console.log("Got tool_use stop, retrying without web search...");
         const retry = await callAPI({
-          model: "claude-sonnet-4-20250514", max_tokens: 2000,
-          messages: [{ role: "user", content: `List the exact probiotic strains in "${productName}". For each strain, provide origin (human/animal/dairy/soil/plant). Return ONLY JSON: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"species","origin":"human|animal|dairy|soil|plant","source":"brief description"},...],"strain_designations_listed":true/false,"notes":"..."}` }],
+          model: "claude-sonnet-4-20250514", max_tokens: 4096,
+          messages: [{ role: "user", content: `List the exact probiotic strains in "${productName}". For each strain, provide origin (human/animal/dairy/soil/plant). Return ONLY JSON, no markdown fences: {"product_name":"...","brand":"...","cfu":"...","strain_count":number,"strains":[{"name":"species","origin":"human|animal|dairy|soil|plant","source":"brief description"},...],"strain_designations_listed":true/false,"notes":"..."}` }],
         });
         let retryText = "";
         if (retry.content && Array.isArray(retry.content)) {
           for (const block of retry.content) { if (block.type === "text" && block.text) retryText += block.text + "\n"; }
         }
-        const m2 = retryText.match(/\{[\s\S]*\}/);
-        if (m2) {
-          const result = JSON.parse(m2[0]);
-          if (!Array.isArray(result.strains)) result.strains = [];
-          setCache(key, result);
-          return result;
+        const retryResult = extractJSON(retryText);
+        if (retryResult) {
+          if (!Array.isArray(retryResult.strains)) retryResult.strains = [];
+          setCache(key, retryResult);
+          return retryResult;
         }
       }
 
@@ -424,15 +440,21 @@
 
     async function analyzePhoto(base64Data, mediaType) {
       const data = await callAPI({
-        model: "claude-sonnet-4-20250514", max_tokens: 1000,
+        model: "claude-sonnet-4-20250514", max_tokens: 4096,
         messages: [{ role: "user", content: [
           { type: "image", source: { type: "base64", media_type: mediaType, data: base64Data } },
-          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a JSON object: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON.` }
+          { type: "text", text: `Read this supplement facts label. Extract all probiotic strains/species. For EACH strain, classify its original isolation source as one of: "human" (isolated from human body), "animal" (isolated from animal intestines), "dairy" (from dairy/yogurt/cheese cultures), "soil" (soil/environmental spore-formers), or "plant" (from fermented foods/plants). Return ONLY a raw JSON object with NO markdown fences: {"product_name":"product name if visible or 'Unknown Product'","brand":"brand if visible or 'Unknown'","cfu":"total CFU","strain_count":number,"strains":[{"name":"full species name","origin":"human|animal|dairy|soil|plant","source":"brief origin description"},...],"strain_designations_listed":true/false,"notes":"..."}\nUse full scientific species names. Return ONLY valid JSON, no backticks.` }
         ] }],
       });
-      const text = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "";
-      const m = text.match(/\{[\s\S]*\}/);
-      if (m) return JSON.parse(m[0]);
+      let text = "";
+      if (data.content && Array.isArray(data.content)) {
+        for (const block of data.content) { if (block.type === "text" && block.text) text += block.text + "\n"; }
+      }
+      const result = extractJSON(text);
+      if (result) {
+        if (!Array.isArray(result.strains)) result.strains = [];
+        return result;
+      }
       throw new Error("Could not read label");
     }
 
