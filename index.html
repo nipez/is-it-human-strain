@@ -654,7 +654,31 @@
             <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 20px",lineHeight:1.6}}>Human-native strains. Clinically studied. No fillers, no tourists.<br/>Now compare it to what you've been taking.</p>
             <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop Human Strain™</a>
           </div>
+        ) : grade.grade.startsWith("A") && total > 0 && total <= 3 ? (
+          /* High-scoring competitor with few strains — acknowledge quality, differentiate */
+          <div className="cta-box" style={{borderRadius:16,background:"#1A1A2E",border:"none"}}>
+            <p style={{fontSize:20,fontWeight:700,color:"#FFFFFF",margin:"0 0 12px"}}>🧬 This product uses quality strains.</p>
+            <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 16px",lineHeight:1.6}}>That said, here's what sets Human Strain™ apart:</p>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20,textAlign:"left",maxWidth:520,margin:"0 auto 20px"}}>
+              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>🎯</span><span style={{fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.5}}><strong style={{color:"#fff"}}>Precision single-strain dosing</strong> — one clinically studied strain at an effective dose, not a multi-strain blend</span></div>
+              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>🌱</span><span style={{fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.5}}><strong style={{color:"#fff"}}>Built-in synbiotic system</strong> — GOS + XOS prebiotics paired with the probiotic so your bacteria arrive with their own food supply</span></div>
+              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>🏷️</span><span style={{fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.5}}><strong style={{color:"#fff"}}>Named strain designations</strong> — HS01 and HS02 are specific, traceable strains you can verify</span></div>
+            </div>
+            <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>See the Human Strain™ difference</a>
+          </div>
+        ) : grade.grade.startsWith("A") ? (
+          /* High-scoring but kitchen-sink competitor — acknowledge human strains, call out bloat */
+          <div className="cta-box" style={{borderRadius:16,background:"#1A1A2E",border:"none"}}>
+            <p style={{fontSize:20,fontWeight:700,color:"#FFFFFF",margin:"0 0 12px"}}>🧬 Good strains — but do you need all {total} of them?</p>
+            <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 16px",lineHeight:1.6}}>This product uses human-native species, which is great. But more strains doesn't mean better results. Human Strain™ takes a different approach:</p>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20,textAlign:"left",maxWidth:520,margin:"0 auto 20px"}}>
+              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>🎯</span><span style={{fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.5}}><strong style={{color:"#fff"}}>One strain, clinically dosed</strong> — precision over volume</span></div>
+              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>🌱</span><span style={{fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.5}}><strong style={{color:"#fff"}}>Synbiotic colonization support</strong> — paired prebiotics for sustained residency, not just transit</span></div>
+            </div>
+            <a href="https://humanstrain.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>See the Human Strain™ difference</a>
+          </div>
         ) : recommendation ? (
+          /* Low-scoring competitor — recommend specific product */
           <div className="cta-box" style={{borderRadius:16,background:"#1A1A2E",border:"none"}}>
             <p style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.4)",margin:"0 0 12px"}}>What to take instead</p>
             <p style={{fontSize:22,fontWeight:700,color:"#FFFFFF",margin:"0 0 8px"}}>🧬 {recommendation.product}</p>
@@ -872,6 +896,7 @@
           return;
         }
         setLoading(true); setError(""); setLoadingMsg("Searching for product details...");
+        window.scrollTo({ top: 0, behavior: "smooth" });
         try {
           const d = await lookupProduct(name);
           const strains = Array.isArray(d.strains) ? d.strains : [];
@@ -981,8 +1006,11 @@
           <p style={{fontSize:18,color:"var(--text-secondary)",lineHeight:1.6,maxWidth:520,margin:"0 auto"}}>Search any probiotic product to see what's really inside.</p>
         </div>
 
+        {/* Loading — shown in place of search */}
+        {loading && <div id="loading-indicator" style={{textAlign:"center",padding:"60px 20px",marginBottom:24,animation:"pulse 1.5s ease infinite",background:"var(--bg-secondary)",border:"1px solid var(--border-color)",borderRadius:16}}><div style={{fontSize:36,marginBottom:16}}>🧬</div><p style={{fontSize:18,fontWeight:600,color:"var(--text-primary)"}}>{loadingMsg}</p><p style={{fontSize:18,color:"var(--text-tertiary)",marginTop:6}}>This takes 10–20 seconds...</p></div>}
+
         {/* Hero Search */}
-        {!productData && !pendingPhoto && !product2 && <>
+        {!productData && !pendingPhoto && !product2 && !loading && <>
           {compareMode && product1 && <div style={{background:"rgba(124,111,224,0.06)",border:"1px solid rgba(124,111,224,0.2)",borderRadius:12,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
             <div><span style={{fontSize:18,fontWeight:600,color:"#7C6FE0"}}>Comparing: {product1.product_name}</span><br/><span style={{fontSize:18,color:"var(--text-secondary)"}}>Now search for the second product below</span></div>
             <button onClick={reset} style={{background:"none",border:"1px solid var(--border-color)",borderRadius:8,padding:"6px 12px",fontSize:18,color:"var(--text-tertiary)",cursor:"pointer"}}>Cancel</button>
@@ -994,9 +1022,6 @@
             <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{display:"none"}} />
           </div>
         </>}
-
-        {/* Loading */}
-        {loading && <div style={{textAlign:"center",padding:"60px 20px",marginBottom:24,animation:"pulse 1.5s ease infinite"}}><div style={{fontSize:36,marginBottom:16}}>🧬</div><p style={{fontSize:18,fontWeight:600,color:"var(--text-primary)"}}>{loadingMsg}</p><p style={{fontSize:18,color:"var(--text-tertiary)",marginTop:6}}>This takes 10–20 seconds...</p></div>}
 
         {/* Error */}
         {error && <div style={{padding:"16px 20px",borderRadius:12,marginBottom:20,background:"rgba(224,85,85,0.08)",border:"1px solid rgba(224,85,85,0.2)",color:"#E05555",fontSize:18}}>{error}</div>}
