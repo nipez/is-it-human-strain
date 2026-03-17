@@ -358,11 +358,24 @@
 
     function cacheKey(name) { return name.toLowerCase().trim().replace(/[^a-z0-9]/g, "_"); }
 
-    async function callAPI(body) {
+    async function callAPI(body, retries = 2) {
       const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
       console.log("API response:", JSON.stringify(data).slice(0, 500));
-      if (data.error) throw new Error(data.error.message || data.error);
+      if (data.error) {
+        const msg = data.error.message || JSON.stringify(data.error);
+        // Retry on rate limit with exponential backoff
+        if (msg.includes("rate_limit") && retries > 0) {
+          console.log(`Rate limited, retrying in ${(3-retries)*5}s... (${retries} retries left)`);
+          await new Promise(r => setTimeout(r, (3-retries) * 5000));
+          return callAPI(body, retries - 1);
+        }
+        // Clean up error messages for users
+        if (msg.includes("rate_limit")) throw new Error("Too many searches — please wait 30 seconds and try again.");
+        if (msg.includes("credit") || msg.includes("billing")) throw new Error("Service temporarily unavailable. Please try again shortly.");
+        if (msg.includes("overloaded")) throw new Error("Our analysis service is busy. Please try again in a moment.");
+        throw new Error(msg);
+      }
       return data;
     }
 
