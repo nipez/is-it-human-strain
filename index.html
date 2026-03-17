@@ -512,17 +512,19 @@
     // SMART RECOMMENDATION ENGINE
     // ═══════════════════════════════════════════════════
     const RECOMMENDATIONS = {
-      "gut-brain": { product: "Human Strain™ B. longum", desc: "Clinically linked to gut-brain axis support — mood, stress resilience, and sleep quality.", url: "https://humanstrain.com", match: ["mood","brain","stress","sleep","cognitive","anxiety","mental","psychobiotic","gut-brain"] },
-      "lactose": { product: "Holy Cow! Lactose Digestion", desc: "Once-daily probiotic that trains your gut to digest lactose 24/7 — not a per-meal enzyme pill.", url: "https://humanstrain.com", match: ["lactose","dairy","lactase","digestion","digestive","bloating","gas"] },
-      "general": { product: "Human Strain™ B. adolescentis", desc: "The centenarian strain — abundant in long-lived populations, declines with age. Keystone species for gut-immune signaling.", url: "https://humanstrain.com", match: ["general","gut","immune","health","daily","probiotic","digestive"] },
-      "women": { product: "Human Strain™ (Women's line coming soon)", desc: "Human-native strains for the gut-skin-hair axis. Join the waitlist.", url: "https://humanstrain.com", match: ["women","vaginal","uti","urinary","feminine","ph balance","beauty","skin","hair"] },
+      "lactose": { product: "Holy Cow! Lactose Digestion", desc: "The only once-daily probiotic that trains your gut to digest lactose 24/7 — not a per-meal enzyme pill.", url: "https://humanstrain.com", match: ["lactose","lactase","lactose intolerance","dairy intolerance","dairy digestion"] },
+      "gut-brain": { product: "Human Strain™ B. longum", desc: "Clinically linked to gut-brain axis support — mood, stress resilience, and sleep quality. 100% human-native.", url: "https://humanstrain.com", match: ["mood","brain","stress","sleep","cognitive","anxiety","mental","psychobiotic","gut-brain","calm","focus","relaxation"] },
+      "women": { product: "Human Strain™ (Women's line coming soon)", desc: "Human-native strains for the gut-skin-hair axis. Join the waitlist.", url: "https://humanstrain.com", match: ["women","vaginal","uti","urinary","feminine","ph balance","beauty","skin","hair","yeast","candida"] },
+      "general": { product: "Human Strain™ B. adolescentis", desc: "The centenarian strain — abundant in long-lived populations, declines with age. Keystone species for gut-immune signaling. 100% human-native.", url: "https://humanstrain.com", match: [] },
     };
 
     function getRecommendation(productData) {
       const text = [productData.product_name, productData.brand, productData.notes || ""].join(" ").toLowerCase();
-      for (const [key, rec] of Object.entries(RECOMMENDATIONS)) {
-        if (rec.match.some(kw => text.includes(kw))) return rec;
+      // Check lactose, gut-brain, and women first (specific matches only)
+      for (const key of ["lactose", "gut-brain", "women"]) {
+        if (RECOMMENDATIONS[key].match.some(kw => text.includes(kw))) return RECOMMENDATIONS[key];
       }
+      // Everything else gets B. adolescentis
       return RECOMMENDATIONS.general;
     }
 
@@ -554,7 +556,7 @@
       return <div style={{position:"relative",width:140,height:140}}><svg width="140" height="140" viewBox="0 0 140 140"><circle cx="70" cy="70" r={r} fill="none" stroke="var(--border-color)" strokeWidth="10"/><circle cx="70" cy="70" r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} transform="rotate(-90 70 70)" style={{transition:"stroke-dashoffset 1s ease"}}/></svg><div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:32,fontWeight:800,color}}>{pct}%</span><span style={{fontSize:18,color:"var(--text-tertiary)",fontWeight:600}}>Human</span></div></div>;
     }
 
-    function AnalysisView({ productData, classifiedStrains, onReset, onCompare }) {
+    function AnalysisView({ productData, classifiedStrains, onReset, onCompare, onShare, shareMsg }) {
       const humanStrains = classifiedStrains.filter(s => s.origin === "human");
       const nonHumanStrains = classifiedStrains.filter(s => s.origin !== "human");
       const total = classifiedStrains.length, humanCount = humanStrains.length;
@@ -579,6 +581,7 @@
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:10}}>
           <button onClick={onReset} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:0}}>← Analyze another product</button>
           {!isOwn && onCompare && <button onClick={onCompare} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:"8px 16px",borderRadius:99}}>⚖️ Compare with another</button>}
+          {onShare && <button onClick={onShare} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(124,111,224,0.08)",border:"1px solid rgba(124,111,224,0.2)",color:"#7C6FE0",fontSize:18,fontWeight:600,cursor:"pointer",padding:"8px 16px",borderRadius:99}}>{shareMsg || "🔗 Share result"}</button>}
         </div>
 
         {/* Product Header with Grade */}
@@ -846,6 +849,7 @@
       const [classifiedStrains, setClassifiedStrains] = useState(null);
       const [pendingPhoto, setPendingPhoto] = useState(null);
       const [photoProductName, setPhotoProductName] = useState("");
+      const [shareMsg, setShareMsg] = useState("");
       const fileRef = useRef(null);
       // Comparison state
       const [compareMode, setCompareMode] = useState(false);
@@ -854,37 +858,79 @@
       const [product2, setProduct2] = useState(null);
       const [strains2, setStrains2] = useState(null);
 
-      const handleProductSearch = async () => {
-        if (!productQuery.trim()) return;
-        // Check known products first (instant, no API call)
-        const known = findKnownProduct(productQuery);
+      // Search function that can be called directly with a name
+      const searchProduct = async (name) => {
+        if (!name.trim()) return;
+        const known = findKnownProduct(name);
         if (known) {
           const c = classifyStrains(known.strains || []);
           if (compareMode && product1) {
-            setProduct2(known); setStrains2(c); setProductData(null); setClassifiedStrains(null);
+            setProduct2(known); setStrains2(c);
           } else {
-            setProductData(known); setClassifiedStrains(c);
+            setProductData(known); setClassifiedStrains(c); updateURL(known.product_name);
           }
           return;
         }
         setLoading(true); setError(""); setLoadingMsg("Searching for product details...");
-        try { 
-          const d = await lookupProduct(productQuery); 
-          console.log("Product data:", d);
-          setLoadingMsg("Classifying strains..."); 
+        try {
+          const d = await lookupProduct(name);
           const strains = Array.isArray(d.strains) ? d.strains : [];
-          const c = classifyStrains(strains); 
+          const c = classifyStrains(strains);
           if (compareMode && product1) {
-            setProduct2(d); setStrains2(c); setProductData(null); setClassifiedStrains(null);
+            setProduct2(d); setStrains2(c);
           } else {
-            setProductData(d); setClassifiedStrains(c);
+            setProductData(d); setClassifiedStrains(c); updateURL(d.product_name);
           }
-        } catch(e) { 
-          console.error("Search failed:", e); 
-          setError("Couldn't find that product: " + e.message); 
+        } catch(e) {
+          console.error("Search failed:", e);
+          setError("Couldn't find that product: " + e.message);
         }
         setLoading(false);
       };
+
+      // Auto-search from URL param on mount
+      const autoSearched = useRef(false);
+      useEffect(() => {
+        if (autoSearched.current) return;
+        const params = new URLSearchParams(window.location.search);
+        const p = params.get("product");
+        if (p) {
+          autoSearched.current = true;
+          setProductQuery(p);
+          searchProduct(p);
+        }
+      }, []);
+
+      // Update URL when product is analyzed
+      const updateURL = (name) => {
+        if (name) {
+          const url = new URL(window.location);
+          url.searchParams.set("product", name);
+          window.history.replaceState({}, "", url);
+        }
+      };
+
+      const shareResult = () => {
+        if (!productData) return;
+        const url = new URL(window.location.origin + window.location.pathname);
+        url.searchParams.set("product", productData.product_name);
+        navigator.clipboard.writeText(url.toString()).then(() => {
+          setShareMsg("Link copied!");
+          setTimeout(() => setShareMsg(""), 2000);
+        }).catch(() => {
+          // Fallback for older browsers
+          const input = document.createElement("input");
+          input.value = url.toString();
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand("copy");
+          document.body.removeChild(input);
+          setShareMsg("Link copied!");
+          setTimeout(() => setShareMsg(""), 2000);
+        });
+      };
+
+      const handleProductSearch = () => searchProduct(productQuery);
 
       const handlePhotoUpload = async e => {
         const file = e.target.files?.[0]; if (!file) return;
@@ -895,7 +941,7 @@
           setLoadingMsg("Classifying strains...");
           const c = classifyStrains(d.strains||[]);
           const hasName = d.product_name && !d.product_name.toLowerCase().includes("unknown");
-          if (hasName) { setProductData(d); setClassifiedStrains(c); } else { setPendingPhoto({data:d,classified:c}); setPhotoProductName(""); }
+          if (hasName) { setProductData(d); setClassifiedStrains(c); updateURL(d.product_name); } else { setPendingPhoto({data:d,classified:c}); setPhotoProductName(""); }
         } catch(e) { setError("Couldn't read that label. Try a clearer photo."); }
         setLoading(false); if(fileRef.current) fileRef.current.value="";
       };
@@ -907,7 +953,7 @@
         setClassifiedStrains(pendingPhoto.classified); setPendingPhoto(null); setPhotoProductName("");
       };
 
-      const reset = () => { setProductData(null); setClassifiedStrains(null); setPendingPhoto(null); setPhotoProductName(""); setError(""); setProductQuery(""); setCompareMode(false); setProduct1(null); setStrains1(null); setProduct2(null); setStrains2(null); };
+      const reset = () => { setProductData(null); setClassifiedStrains(null); setPendingPhoto(null); setPhotoProductName(""); setError(""); setProductQuery(""); setCompareMode(false); setProduct1(null); setStrains1(null); setProduct2(null); setStrains2(null); setShareMsg(""); window.history.replaceState({}, "", window.location.pathname); };
 
       const startCompare = () => {
         // Save current product as product1, show search for product2
@@ -965,7 +1011,7 @@
         </div></div>}
 
         {/* Analysis — single product */}
-        {productData && classifiedStrains && !product2 && <div style={{marginBottom:40}}><AnalysisView productData={productData} classifiedStrains={classifiedStrains} onReset={reset} onCompare={startCompare} /></div>}
+        {productData && classifiedStrains && !product2 && <div style={{marginBottom:40}}><AnalysisView productData={productData} classifiedStrains={classifiedStrains} onReset={reset} onCompare={startCompare} onShare={shareResult} shareMsg={shareMsg} /></div>}
 
         {/* Comparison View — two products */}
         {product1 && strains1 && product2 && strains2 && <div style={{marginBottom:40}}><ComparisonView product1={product1} strains1={strains1} product2={product2} strains2={strains2} onReset={reset} /></div>}
