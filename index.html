@@ -589,19 +589,38 @@
           <div className="analysis-header">
             <div style={{flex:1,minWidth:200}}>
               <p style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color: isOwn ? "#7C6FE0" : "var(--text-tertiary)",margin:"0 0 6px"}}>{productData.brand||""}</p>
-              <h2 style={{fontSize:22,fontWeight:700,color:"var(--text-primary)",margin:"0 0 8px"}}>{productData.product_name}</h2>
-              <div className="analysis-stats">
-                {productData.cfu && productData.cfu !== "N/A (prebiotic)" && <span><strong>{productData.cfu}</strong> CFU</span>}
-                {total > 0 && <span><strong>{total}</strong> strain{total!==1?"s":""}</span>}
-                {humanCount > 0 && <span><strong>{humanCount}</strong> human-native</span>}
-                {(total-humanCount) > 0 && <span><strong style={{color:"#E05555"}}>{total-humanCount}</strong> non-human</span>}
-                {isOwn && total > 0 && <span style={{color:"#7C6FE0",fontWeight:600}}>✓ 100% Human-Native</span>}
-              </div>
-              {productData.notes && <p style={{fontSize:18,color:"var(--text-secondary)",lineHeight:1.6,marginTop:10}}>{productData.notes}</p>}
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--text-primary)",margin:"0 0 12px"}}>{productData.product_name}</h2>
+
+              {/* Stat pills */}
+              {total > 0 && <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+                {productData.cfu && productData.cfu !== "N/A (prebiotic)" && <span style={{padding:"6px 14px",borderRadius:99,fontSize:18,fontWeight:600,background:"var(--bg-tertiary)",color:"var(--text-primary)"}}>{productData.cfu} CFU</span>}
+                <span style={{padding:"6px 14px",borderRadius:99,fontSize:18,fontWeight:600,background:"var(--bg-tertiary)",color:"var(--text-primary)"}}>{total} strain{total!==1?"s":""}</span>
+                {productData.strain_designations_listed ? 
+                  <span style={{padding:"6px 14px",borderRadius:99,fontSize:18,fontWeight:600,background:"rgba(85,168,107,0.1)",color:"#55A86B"}}>✓ Strain IDs listed</span> :
+                  !isOwn && <span style={{padding:"6px 14px",borderRadius:99,fontSize:18,fontWeight:600,background:"rgba(224,168,85,0.1)",color:"#E0A855"}}>⚠ No strain IDs</span>
+                }
+              </div>}
+
+              {/* Human-native bar */}
+              {total > 0 && <div style={{marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:18,fontWeight:600,color:"var(--text-primary)"}}>{humanCount} of {total} strains are human-native</span>
+                  {isOwn && <span style={{fontSize:18,fontWeight:700,color:"#7C6FE0"}}>100%</span>}
+                </div>
+                <div style={{height:10,borderRadius:99,background:"var(--bg-tertiary)",overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:99,width:`${total>0?Math.round((humanCount/total)*100):0}%`,background: humanCount===total?"#7C6FE0":humanCount/total>=0.5?"#E0A855":"#E05555",transition:"width 0.8s ease"}} />
+                </div>
+                {humanCount < total && <div style={{display:"flex",gap:12,marginTop:8,fontSize:18,color:"var(--text-secondary)"}}>
+                  <span>🧬 <strong style={{color:"#7C6FE0"}}>{humanCount}</strong> human</span>
+                  {classifiedStrains.filter(s=>s.origin==="animal").length > 0 && <span>🐄 <strong style={{color:"#E05555"}}>{classifiedStrains.filter(s=>s.origin==="animal").length}</strong> animal</span>}
+                  {classifiedStrains.filter(s=>s.origin==="dairy").length > 0 && <span>🧀 <strong style={{color:"#E0A855"}}>{classifiedStrains.filter(s=>s.origin==="dairy").length}</strong> dairy</span>}
+                  {classifiedStrains.filter(s=>s.origin==="soil").length > 0 && <span>🪨 <strong style={{color:"#8B7355"}}>{classifiedStrains.filter(s=>s.origin==="soil").length}</strong> soil</span>}
+                  {classifiedStrains.filter(s=>s.origin==="plant").length > 0 && <span>🥬 <strong style={{color:"#55A86B"}}>{classifiedStrains.filter(s=>s.origin==="plant").length}</strong> plant</span>}
+                </div>}
+              </div>}
             </div>
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-              {total > 0 && <ScoreRing humanCount={humanCount} total={total} />}
-              <GradeBadge grade={grade} size={64} />
+              <GradeBadge grade={grade} size={80} />
             </div>
           </div>
         </div>
@@ -680,7 +699,7 @@
         ) : recommendation ? (
           /* Low-scoring competitor — recommend specific product */
           <div className="cta-box" style={{borderRadius:16,background:"#1A1A2E",border:"none"}}>
-            <p style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.4)",margin:"0 0 12px"}}>What to take instead</p>
+            <p style={{fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.4)",margin:"0 0 12px"}}>Why Human Strain™ is different</p>
             <p style={{fontSize:22,fontWeight:700,color:"#FFFFFF",margin:"0 0 8px"}}>🧬 {recommendation.product}</p>
             <p style={{fontSize:18,color:"rgba(255,255,255,0.7)",margin:"0 0 20px",lineHeight:1.6}}>{recommendation.desc}</p>
             <a href={recommendation.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 32px",background:"#7C6FE0",color:"#fff",fontSize:18,fontWeight:700,borderRadius:99,textDecoration:"none"}}>Shop {recommendation.product.split(" —")[0]}</a>
